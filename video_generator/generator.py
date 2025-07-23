@@ -96,8 +96,10 @@ def render_scene(scene: SceneInput, use_global_narration: bool = False, task_id:
                     raise
             elif scene.narration_text:
                 try:
-                    logger.info(f"Generating narration from text.", extra={"task_id": task_id})
-                    narration_path = generate_narration(scene.narration_text)
+                    # Support per-scene audio_prompt_url
+                    audio_prompt_url = getattr(scene, 'audio_prompt_url', None)
+                    logger.info(f"Generating narration from text. audio_prompt_url={audio_prompt_url}", extra={"task_id": task_id})
+                    narration_path = generate_narration(text=scene.narration_text, audio_prompt_url=audio_prompt_url)
                     temp_files.append(narration_path)
                     logger.info(f"Added narration from text: {narration_path}", extra={"task_id": task_id})
                     try:
@@ -211,11 +213,12 @@ def generate_video_core(request_dict, task_id=None):
     use_global_narration = bool(request.get("narration_text"))
     narration_path = None
     narration_duration = None
+    global_audio_prompt_url = request.get("audio_prompt_url")  # NEW: get global audio_prompt_url
     try:
         if use_global_narration:
             try:
                 logger.info(f"Generating global narration.", extra={"task_id": task_id})
-                narration_path = generate_narration(request["narration_text"])
+                narration_path = generate_narration(request["narration_text"], audio_prompt_url=global_audio_prompt_url)
                 temp_files.append(narration_path)
                 from moviepy.audio.io.AudioFileClip import AudioFileClip
                 narration_clip = AudioFileClip(narration_path)
@@ -231,6 +234,40 @@ def generate_video_core(request_dict, task_id=None):
         for idx, scene in enumerate(request["scenes"]):
             try:
                 logger.info(f"Processing scene {idx+1}/{len(request['scenes'])}", extra={"task_id": task_id})
+                # Per-scene narration
+                if not use_global_narration:
+                    if scene.get("narration"):
+                        try:
+                            logger.info(f"Downloading narration asset: {scene.narration}", extra={"task_id": task_id})
+                            narration_path = download_asset(scene.narration)
+                            temp_files.append(narration_path)
+                            logger.info(f"Added narration from file: {narration_path}", extra={"task_id": task_id})
+                        except Exception as e:
+                            logger.error(f"Failed to download narration asset: {e}", exc_info=True, extra={"task_id": task_id})
+                            raise
+                    elif scene.get("narration_text"):
+                        try:
+                            # Use scene audio_prompt_url if set, else use global
+                            audio_prompt_url = scene.get("audio_prompt_url", global_audio_prompt_url)
+                            logger.info(f"Generating narration from text. audio_prompt_url={audio_prompt_url}", extra={"task_id": task_id})
+                            narration_path = generate_narration(scene["narration_text"], audio_prompt_url=audio_prompt_url)
+                            temp_files.append(narration_path)
+                            logger.info(f"Added narration from text: {narration_path}", extra={"task_id": task_id})
+                            try:
+                                from moviepy.audio.io.AudioFileClip import AudioFileClip
+                                narration_audio = AudioFileClip(narration_path)
+                                silence = AudioClip(lambda t: 0, duration=1.5, fps=44100)
+                                # Only update duration, do not replace scene dict
+                                if "type" not in scene:
+                                    logger.error(f"Scene missing required 'type' field after narration generation: {scene}", extra={"task_id": task_id})
+                                    raise ValueError("Scene missing required 'type' field after narration generation")
+                                scene["duration"] = int(round(narration_audio.duration + 1.5))
+                            except Exception as e:
+                                logger.error(f"Failed to load narration audio: {e}", exc_info=True, extra={"task_id": task_id})
+                                raise
+                        except Exception as e:
+                            logger.error(f"Failed to generate narration: {e}", exc_info=True, extra={"task_id": task_id})
+                            raise
                 scene_file, files_to_clean = render_scene(SceneInput(**scene), use_global_narration=use_global_narration, task_id=task_id)
                 scene_files.append(scene_file)
                 temp_files.extend(files_to_clean)
@@ -243,10 +280,14 @@ def generate_video_core(request_dict, task_id=None):
             logger.info(f"Loading scene video clips for concatenation.", extra={"task_id": task_id})
             clips = [VideoFileClip(f) for f in scene_files]
             logger.info(f"Concatenating {len(clips)} scene clips.", extra={"task_id": task_id})
-            final_clip = concatenate_videoclips(clips, method="compose")
-            output_path = os.path.join(Config.OUTPUT_DIR, f"{uuid.uuid4().hex}_{request['output_filename']}")
+            # --- Update: include task_id in output file name ---
+            output_filename = request['output_filename']
+            if task_id:
+                output_filename = f"{task_id}_{output_filename}"
+            output_path = os.path.join(Config.OUTPUT_DIR, output_filename)
             os.makedirs(os.path.dirname(output_path), exist_ok=True)
             logger.info(f"Exporting final video to {output_path}", extra={"task_id": task_id})
+            final_clip = concatenate_videoclips(clips, method="compose")
             final_clip.write_videofile(
                 output_path,
                 fps=24,

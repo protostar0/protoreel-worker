@@ -13,29 +13,65 @@ from chatterbox.tts import ChatterboxTTS
 import whisper
 from moviepy import TextClip, CompositeVideoClip
 from video_generator.config import Config
+import requests
 
-def generate_narration(text: str) -> str:
+def download_audio_prompt(url: str, temp_dir: str) -> str:
+    local_path = os.path.join(temp_dir, f"audio_prompt_{uuid.uuid4().hex}.wav")
+    try:
+        r = requests.get(url, stream=True, timeout=60)
+        r.raise_for_status()
+        with open(local_path, 'wb') as f:
+            for chunk in r.iter_content(chunk_size=8192):
+                f.write(chunk)
+        return local_path
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to download audio prompt: {e}")
+
+def generate_narration(text: str, audio_prompt_url: Optional[str] = None) -> str:
     """
     Generate narration audio from text using ChatterboxTTS.
+    If audio_prompt_url is provided, use it as the audio_prompt_path.
     Returns the path to the generated audio file.
     """
     logger = logging.getLogger(__name__)
-    logger.info(f"Generating narration for text: {text[:60]}...")
+    logger.info(f"[NARRATION] Generating narration for text: {text[:60]}...")
     TEMP_DIR = Config.TEMP_DIR
     local_filename = os.path.join(TEMP_DIR, f"narration_{uuid.uuid4().hex}.mp3")
+    audio_prompt_path = None
     try:
+        logger.info("[NARRATION] Loading TTS model...")
         model = ChatterboxTTS.from_pretrained(device="cpu")
-        wav = model.generate(
-            text,
-            exaggeration=0.5,
-            cfg_weight=0.5
-        )
+        logger.info("[NARRATION] Model loaded. Generating audio...")
+        if audio_prompt_url:
+            logger.info(f"[NARRATION] Downloading audio prompt from {audio_prompt_url}")
+            audio_prompt_path = download_audio_prompt(audio_prompt_url, TEMP_DIR)
+            logger.info(f"[NARRATION] Audio prompt downloaded to {audio_prompt_path}")
+            wav = model.generate(
+                text,
+                exaggeration=0.5,
+                cfg_weight=0.5,
+                audio_prompt_path=audio_prompt_path
+            )
+        else:
+            wav = model.generate(
+                text,
+                exaggeration=0.5,
+                cfg_weight=0.5
+            )
+        logger.info("[NARRATION] Audio generated. Saving to file...")
         ta.save(local_filename, wav, model.sr)
-        logger.info(f"Generated narration at {local_filename}")
+        logger.info(f"[NARRATION] Narration saved at {local_filename}")
         return local_filename
     except Exception as e:
-        logger.error(f"Failed to generate narration: {e}")
+        logger.error(f"[NARRATION] Failed to generate narration: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to generate narration: {e}")
+    finally:
+        if audio_prompt_path and os.path.exists(audio_prompt_path):
+            try:
+                os.remove(audio_prompt_path)
+                logger.info(f"[NARRATION] Deleted temp audio prompt: {audio_prompt_path}")
+            except Exception as e:
+                logger.warning(f"[NARRATION] Failed to delete temp audio prompt: {audio_prompt_path}: {e}")
 
 def generate_whisper_phrase_subtitles(audio_path: str, video_clip, words_per_line: int = 4, font_size: int = 50) -> List:
     """

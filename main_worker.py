@@ -49,6 +49,20 @@ def notify_backend_task_failed(task_id, error):
 
 @app.post("/process-task")
 async def process_task(request: Request):
+    """
+    Receives a video generation task.
+    The request_dict can include an optional 'audio_prompt_url' for global narration.
+    Example payload:
+    {
+        "task_id": "...",
+        "request_dict": {
+            "output_filename": "...",
+            "scenes": [...],
+            "narration_text": "...",
+            "audio_prompt_url": "https://.../file.wav"  # Optional
+        }
+    }
+    """
     payload = await request.json()
     task_id = payload["task_id"]
     request_dict = payload["request_dict"]
