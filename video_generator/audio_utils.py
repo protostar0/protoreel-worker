@@ -40,8 +40,9 @@ def generate_narration(text: str, audio_prompt_url: Optional[str] = None) -> str
     audio_prompt_path = None
     try:
         logger.info("[NARRATION] Loading TTS model...")
-        model = ChatterboxTTS.from_pretrained(device="cpu")
-        logger.info("[NARRATION] Model loaded. Generating audio...")
+        device = os.environ.get("TTS_DEVICE", "cpu")
+        model = ChatterboxTTS.from_pretrained(device=device)
+        logger.info(f"[NARRATION] Model loaded on device: {device}. Generating audio...")
         if audio_prompt_url:
             logger.info(f"[NARRATION] Downloading audio prompt from {audio_prompt_url}")
             audio_prompt_path = download_audio_prompt(audio_prompt_url, TEMP_DIR)
