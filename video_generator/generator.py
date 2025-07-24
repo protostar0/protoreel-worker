@@ -288,15 +288,47 @@ def generate_video_core(request_dict, task_id=None):
             os.makedirs(os.path.dirname(output_path), exist_ok=True)
             logger.info(f"Exporting final video to {output_path}", extra={"task_id": task_id})
             final_clip = concatenate_videoclips(clips, method="compose")
+            # --- Enforce Instagram Reels duration limits ---
+            min_duration = 3
+            max_duration = 90
+            if final_clip.duration < min_duration:
+                logger.warning(f"Final video duration {final_clip.duration:.2f}s is less than {min_duration}s. Padding with black frames.", extra={"task_id": task_id})
+                from moviepy.editor import ColorClip
+                pad_duration = min_duration - final_clip.duration
+                black_clip = ColorClip(size=final_clip.size, color=(0,0,0), duration=pad_duration)
+                final_clip = concatenate_videoclips([final_clip, black_clip], method="compose")
+            elif final_clip.duration > max_duration:
+                logger.warning(f"Final video duration {final_clip.duration:.2f}s exceeds {max_duration}s. Trimming.", extra={"task_id": task_id})
+                final_clip = final_clip.subclip(0, max_duration)
+            # --- Export at 30 fps ---
             final_clip.write_videofile(
                 output_path,
-                fps=24,
+                fps=30,
                 codec="libx264",
                 audio_codec="aac",
+                audio_fps=48000,
                 temp_audiofile=f"{output_path}.temp_audio.m4a",
                 remove_temp=True,
+                threads=4,
+                preset="slow",
+                ffmpeg_params=[
+                    "-profile:v", "high",
+                    "-level", "4.0",
+                    "-pix_fmt", "yuv420p",
+                    "-movflags", "+faststart",
+                    "-b:v", "2000k",
+                    "-maxrate", "2500k",
+                    "-bufsize", "5000k",
+                    "-r", "30",  # force frame rate again
+                    "-ac", "2",  # enforce stereo
+                    "-ar", "48000"  # audio resample (again, to avoid backend mismatch)
+                ],
                 logger=None
             )
+            # --- Check file size ---
+            file_size_mb = os.path.getsize(output_path) / (1024 * 1024)
+            if file_size_mb > 100:
+                logger.warning(f"Exported video file size is {file_size_mb:.2f} MB, which may exceed Instagram's limits.", extra={"task_id": task_id})
             final_clip.close()
             del final_clip
             for c in clips:
