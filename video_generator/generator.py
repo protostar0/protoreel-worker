@@ -104,8 +104,8 @@ def render_scene(scene: SceneInput, use_global_narration: bool = False, task_id:
                     logger.info(f"Added narration from text: {narration_path}", extra={"task_id": task_id})
                     try:
                         narration_audio = AudioFileClip(narration_path)
-                        silence = AudioClip(lambda t: 0, duration=1.5, fps=44100)
-                        scene.duration = narration_audio.duration + 1.5
+                        silence = AudioClip(lambda t: 0, duration=0.5, fps=44100)
+                        scene.duration = narration_audio.duration + 0.5
                     except Exception as e:
                         logger.error(f"Failed to load narration audio: {e}", exc_info=True, extra={"task_id": task_id})
                         raise
@@ -155,7 +155,7 @@ def render_scene(scene: SceneInput, use_global_narration: bool = False, task_id:
             try:
                 logger.info(f"Generating subtitles for scene narration.", extra={"task_id": task_id})
                 subtitle_clips = generate_whisper_phrase_subtitles(
-                    narration_path, video_clip, words_per_line=4, font_size=50
+                    narration_path, video_clip, min_words=4, max_words=6, font_size=50
                 )
                 video_clip = CompositeVideoClip([video_clip] + subtitle_clips)
                 logger.info("Subtitles added for scene narration.", extra={"task_id": task_id})
@@ -256,12 +256,12 @@ def generate_video_core(request_dict, task_id=None):
                             try:
                                 from moviepy.audio.io.AudioFileClip import AudioFileClip
                                 narration_audio = AudioFileClip(narration_path)
-                                silence = AudioClip(lambda t: 0, duration=1.5, fps=44100)
+                                silence = AudioClip(lambda t: 0, duration=0.5, fps=44100)
                                 # Only update duration, do not replace scene dict
                                 if "type" not in scene:
                                     logger.error(f"Scene missing required 'type' field after narration generation: {scene}", extra={"task_id": task_id})
                                     raise ValueError("Scene missing required 'type' field after narration generation")
-                                scene["duration"] = int(round(narration_audio.duration + 1.5))
+                                scene["duration"] = int(round(narration_audio.duration + 0.5))
                             except Exception as e:
                                 logger.error(f"Failed to load narration audio: {e}", exc_info=True, extra={"task_id": task_id})
                                 raise

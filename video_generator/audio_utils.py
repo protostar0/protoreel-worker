@@ -74,14 +74,15 @@ def generate_narration(text: str, audio_prompt_url: Optional[str] = None) -> str
             except Exception as e:
                 logger.warning(f"[NARRATION] Failed to delete temp audio prompt: {audio_prompt_path}: {e}")
 
-def generate_whisper_phrase_subtitles(audio_path: str, video_clip, words_per_line: int = 4, font_size: int = 50) -> List:
+def generate_whisper_phrase_subtitles(audio_path: str, video_clip, min_words: int = 4, max_words: int = 6, font_size: int = 50) -> List:
     """
     Generate animated phrase subtitles using Whisper for a given audio file and video clip.
     Returns a list of subtitle TextClip objects.
     """
     import traceback
+    import re
     logger = logging.getLogger(__name__)
-    logger.info(f"[DEBUG] Entered generate_whisper_phrase_subtitles with audio_path={audio_path}, video_clip={video_clip}, words_per_line={words_per_line}, font_size={font_size}")
+    logger.info(f"[DEBUG] Entered generate_whisper_phrase_subtitles with audio_path={audio_path}, video_clip={video_clip}, min_words={min_words}, max_words={max_words}, font_size={font_size}")
     model = whisper.load_model("base")
     try:
         result = model.transcribe(audio_path, word_timestamps=True, verbose=False)
@@ -91,21 +92,35 @@ def generate_whisper_phrase_subtitles(audio_path: str, video_clip, words_per_lin
     all_words = []
     for segment in result['segments']:
         all_words.extend(segment.get('words', []))
+    # Smart line breaking
     lines = []
-    for i in range(0, len(all_words), words_per_line):
-        chunk = all_words[i:i + words_per_line]
-        if not chunk:
-            continue
-        line_text = ' '.join([w['word'].strip() for w in chunk])
-        start = chunk[0]['start']
-        end = chunk[-1]['end']
-        lines.append({'text': line_text.upper(), 'start': start, 'end': end, 'words': chunk})
-    subtitle_clips = []
+    current = []
+    for w in all_words:
+        current.append(w)
+        # If word ends with sentence-ending punctuation or comma, or max_words reached
+        if (re.match(r'.*[.!?]$', w['word']) or
+            (len(current) >= max_words) or
+            (re.match(r'.*,$', w['word']) and len(current) >= min_words)):
+            lines.append(current)
+            current = []
+    if current:
+        lines.append(current)
+    # Merge short lines
+    merged = []
     for line in lines:
+        if merged and len(line) < min_words:
+            merged[-1].extend(line)
+        else:
+            merged.append(line)
+    subtitle_clips = []
+    for line in merged:
         try:
+            line_text = ' '.join([w['word'].strip() for w in line])
+            start = line[0]['start']
+            end = line[-1]['end']
             base_clip = (
                 TextClip(
-                    text = line['text']+"\n_",
+                    text = line_text.upper()+"\n_",
                     font="./video_generator/font/Montserrat-Black.ttf",
                     font_size=font_size,
                     color="white",
@@ -116,8 +131,8 @@ def generate_whisper_phrase_subtitles(audio_path: str, video_clip, words_per_lin
                     size=(video_clip.w - 120, None)
                 )
                 .with_position(("center", int(video_clip.h * 0.6)))
-                .with_start(line['start'])
-                .with_duration(line['end'] - line['start'])
+                .with_start(start)
+                .with_duration(end - start)
             )
             subtitle_clips.append(base_clip)
         except Exception as e:
