@@ -7,7 +7,6 @@ import os
 import uuid
 import requests
 import logging
-from fastapi import HTTPException
 from video_generator.generate_image import generate_image_from_prompt as _generate_image_from_prompt
 from video_generator.config import Config
 
@@ -32,13 +31,13 @@ def download_asset(url_or_path: str) -> str:
             return local_filename
         except Exception as e:
             logger.error(f"Failed to download asset: {url_or_path} ({e})")
-            raise HTTPException(status_code=400, detail=f"Failed to download asset: {url_or_path} ({e})")
+            raise RuntimeError(f"[400] Failed to download asset: {url_or_path} ({e})")
     elif os.path.exists(url_or_path):
         logger.info(f"Using local asset: {url_or_path}")
         return url_or_path
     else:
         logger.error(f"Asset not found: {url_or_path}")
-        raise HTTPException(status_code=400, detail=f"Asset not found: {url_or_path}")
+        raise RuntimeError(f"[400] Asset not found: {url_or_path}")
 
 def generate_image_from_prompt(prompt: str, api_key: str, out_path: str) -> str:
     """

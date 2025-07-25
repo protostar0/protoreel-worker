@@ -6,13 +6,6 @@ from typing import Optional, List
 import os
 import uuid
 import logging
-from fastapi import HTTPException
-from moviepy.audio.io.AudioFileClip import AudioFileClip
-import torchaudio as ta
-from chatterbox.tts import ChatterboxTTS
-import whisper
-from moviepy import TextClip, CompositeVideoClip
-from video_generator.config import Config
 import requests
 
 def download_audio_prompt(url: str, temp_dir: str) -> str:
@@ -25,7 +18,7 @@ def download_audio_prompt(url: str, temp_dir: str) -> str:
                 f.write(chunk)
         return local_path
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to download audio prompt: {e}")
+        raise RuntimeError(f"[400] Failed to download audio prompt: {e}")
 
 def generate_narration(text: str, audio_prompt_url: Optional[str] = None) -> str:
     """
@@ -65,7 +58,7 @@ def generate_narration(text: str, audio_prompt_url: Optional[str] = None) -> str
         return local_filename
     except Exception as e:
         logger.error(f"[NARRATION] Failed to generate narration: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to generate narration: {e}")
+        raise RuntimeError(f"[500] Failed to generate narration: {e}")
     finally:
         if audio_prompt_path and os.path.exists(audio_prompt_path):
             try:
