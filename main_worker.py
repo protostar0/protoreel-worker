@@ -14,11 +14,17 @@ def process_all_pending_tasks():
     import sys
     from db import get_task_by_id, update_task_status
     logger.info("[JOB MODE] Starting process_all_pending_tasks...")
-    # Accept task_id as command-line argument (sys.argv[1])
-    if len(sys.argv) < 2:
-        logger.error("[JOB MODE] No task_id provided. Usage: JOB_MODE=1 python main_worker.py <task_id>")
+    # Accept task_id as positional argument or --task-id=... flag
+    task_id = None
+    for arg in sys.argv[1:]:
+        if arg.startswith("--task-id="):
+            task_id = arg.split("=", 1)[1]
+            break
+        elif not arg.startswith("-") and task_id is None:
+            task_id = arg
+    if not task_id:
+        logger.error("[JOB MODE] No task_id provided. Usage: python main_worker.py <task_id> or --task-id=<task_id>")
         sys.exit(1)
-    task_id = sys.argv[1]
     logger.info(f"[JOB MODE] Processing task_id: {task_id}")
     task = get_task_by_id(task_id)
     if not task:

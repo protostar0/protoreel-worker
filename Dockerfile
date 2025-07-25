@@ -5,7 +5,11 @@ RUN apt-get update && \
     apt-get install -y ffmpeg libsm6 libxext6 git && \
     rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
+# Create output directory and set permissions
+RUN mkdir -p /tmp/generated_videos && chown appuser:appuser /tmp/generated_videos
+
+# Set working directory to the worker code
+WORKDIR /app/protovideo-worker
 
 # Copy requirements and install
 COPY requirements.txt ./
@@ -16,9 +20,6 @@ COPY . .
 
 # Add a non-root user for security
 RUN useradd -m appuser
-
-# Create output directory and set permissions
-RUN mkdir -p /tmp/generated_videos && chown appuser:appuser /tmp/generated_videos
 
 USER appuser
 
