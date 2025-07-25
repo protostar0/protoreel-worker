@@ -42,8 +42,9 @@ def process_all_pending_tasks():
         logger.info(f"[JOB MODE] Task {task_id} finished. Result: {result}")
         sys.exit(0)
     except Exception as e:
-        logger.error(f"[JOB MODE] Error processing task {task_id}: {e}")
-        update_task_status(task_id, 'failed', error=str(e))
+        import traceback
+        logger.error(f"[JOB MODE] Error processing task {task_id}: {e}\n{traceback.format_exc()}", exc_info=True)
+        update_task_status(task_id, 'failed', error=f"{e}\n{traceback.format_exc()}")
         sys.exit(2)
 
 if __name__ == "__main__":

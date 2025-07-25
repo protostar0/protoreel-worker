@@ -7,6 +7,11 @@ import os
 import uuid
 import logging
 import requests
+from video_generator.config import Config
+from chatterbox.tts import ChatterboxTTS
+import torchaudio as ta
+import whisper
+from moviepy import TextClip
 
 def download_audio_prompt(url: str, temp_dir: str) -> str:
     local_path = os.path.join(temp_dir, f"audio_prompt_{uuid.uuid4().hex}.wav")
