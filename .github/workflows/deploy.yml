@@ -33,15 +33,15 @@ jobs:
         docker push gcr.io/${{ secrets.GCP_PROJECT }}/${{ secrets.GCR_IMAGE_NAME }}:latest
     - name: Deploy/Update Cloud Run Job
       run: |
-        gcloud run jobs describe ${{ secrets.CLOUD_RUN_JOB }} --region ${{ secrets.GCP_REGION }} \
-        && gcloud run jobs update ${{ secrets.CLOUD_RUN_JOB }} \
-            --image gcr.io/${{ secrets.GCP_PROJECT }}/${{ secrets.GCR_IMAGE_NAME }}:latest \
-            --region ${{ secrets.GCP_REGION }} \
-            --memory=2Gi --cpu=2 \
-            --set-env-vars="DATABASE_URL=${{ secrets.DATABASE_URL }},R2_BUCKET_NAME=${{ secrets.R2_BUCKET_NAME }},OTHER_ENV=..." \
-        || gcloud run jobs create ${{ secrets.CLOUD_RUN_JOB }} \
+        gcloud run jobs describe "${{ secrets.CLOUD_RUN_JOB }}" --region ${{ secrets.GCP_REGION }} \
+        && gcloud run jobs update "${{ secrets.CLOUD_RUN_JOB }}" \
             --image gcr.io/${{ secrets.GCP_PROJECT }}/${{ secrets.GCR_IMAGE_NAME }}:latest \
             --region ${{ secrets.GCP_REGION }} \
             --memory=4Gi --cpu=2 \
-            --set-env-vars="${{ secrets.WORKER_ENV }}"
+            --set-env-vars="DATABASE_URL=${{ secrets.DATABASE_URL }},R2_BUCKET_NAME=${{ secrets.R2_BUCKET_NAME }},OTHER_ENV=..." \
+        || gcloud run jobs create "${{ secrets.CLOUD_RUN_JOB }}" \
+            --image gcr.io/${{ secrets.GCP_PROJECT }}/${{ secrets.GCR_IMAGE_NAME }}:latest \
+            --region ${{ secrets.GCP_REGION }} \
+            --memory=4Gi --cpu=2 \
+            --set-env-vars="${{ secrets.WORKER_ENV  }}"
       # This step deploys or updates a Cloud Run Job, not a Service.
