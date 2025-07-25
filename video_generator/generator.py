@@ -207,6 +207,7 @@ def render_scene(scene: SceneInput, use_global_narration: bool = False, task_id:
 
 def generate_video_core(request_dict, task_id=None):
     import copy
+    from video_generator.cleanup_utils import cleanup_files
     request = copy.deepcopy(request_dict)
     temp_files = []
     scene_files = []
@@ -214,6 +215,9 @@ def generate_video_core(request_dict, task_id=None):
     narration_path = None
     narration_duration = None
     global_audio_prompt_url = request.get("audio_prompt_url")  # NEW: get global audio_prompt_url
+    clips = []
+    final_clip = None
+    output_path = None
     try:
         if use_global_narration:
             try:
@@ -262,6 +266,7 @@ def generate_video_core(request_dict, task_id=None):
                                     logger.error(f"Scene missing required 'type' field after narration generation: {scene}", extra={"task_id": task_id})
                                     raise ValueError("Scene missing required 'type' field after narration generation")
                                 scene["duration"] = int(round(narration_audio.duration + 0.5))
+                                narration_audio.close()
                             except Exception as e:
                                 logger.error(f"Failed to load narration audio: {e}", exc_info=True, extra={"task_id": task_id})
                                 raise
@@ -293,7 +298,7 @@ def generate_video_core(request_dict, task_id=None):
             max_duration = 90
             if final_clip.duration < min_duration:
                 logger.warning(f"Final video duration {final_clip.duration:.2f}s is less than {min_duration}s. Padding with black frames.", extra={"task_id": task_id})
-                from moviepy.editor import ColorClip
+                from moviepy import ColorClip
                 pad_duration = min_duration - final_clip.duration
                 black_clip = ColorClip(size=final_clip.size, color=(0,0,0), duration=pad_duration)
                 final_clip = concatenate_videoclips([final_clip, black_clip], method="compose")
@@ -329,11 +334,12 @@ def generate_video_core(request_dict, task_id=None):
             file_size_mb = os.path.getsize(output_path) / (1024 * 1024)
             if file_size_mb > 100:
                 logger.warning(f"Exported video file size is {file_size_mb:.2f} MB, which may exceed Instagram's limits.", extra={"task_id": task_id})
-            final_clip.close()
-            del final_clip
             for c in clips:
                 c.close()
                 del c
+            if final_clip:
+                final_clip.close()
+                del final_clip
             gc.collect()
         except Exception as e:
             logger.error(f"Failed to concatenate or export final video: {e}", exc_info=True, extra={"task_id": task_id})
@@ -350,14 +356,18 @@ def generate_video_core(request_dict, task_id=None):
                 logger.info(f"Upload successful: {r2_url}", extra={"task_id": task_id})
                 return {"r2_url": r2_url}
             else:
-                logger.error("R2 upload failed: No URL returned.", extra={"task_id": task_id})
-                raise RuntimeError("Cloud upload failed: No R2 URL returned. Check your R2_PUBLIC_BASE_URL and upload credentials.")
+                logger.error("Upload to R2 failed: No URL returned.", extra={"task_id": task_id})
+                raise RuntimeError("Cloud upload failed: No URL returned.")
         except Exception as e:
-            logger.error(f"R2 upload failed: {e}", exc_info=True, extra={"task_id": task_id})
-            raise RuntimeError(f"Cloud upload failed: {e}")
-    except Exception as e:
-        logger.error(f"Video generation failed: {e}", exc_info=True, extra={"task_id": task_id})
-        raise
+            logger.error(f"Failed to upload to R2: {e}", exc_info=True, extra={"task_id": task_id})
+            raise
     finally:
-        logger.info(f"Cleaning up {len(temp_files)} temp files...", extra={"task_id": task_id})
-        cleanup_files(temp_files) 
+        logger.info(f"Cleaning up {len(temp_files)} temp files at end of job.", extra={"task_id": task_id})
+        cleanup_files(temp_files)
+        if output_path and os.path.exists(output_path):
+            try:
+                os.remove(output_path)
+                logger.info(f"Deleted output video: {output_path}", extra={"task_id": task_id})
+            except Exception as e:
+                logger.warning(f"Failed to delete output video {output_path}: {e}", extra={"task_id": task_id})
+        gc.collect() 

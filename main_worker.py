@@ -1,79 +1,48 @@
-from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import JSONResponse
-from video_generator.generator import generate_video_core
 from video_generator.logging_utils import get_logger
-import requests
 import os
 import dotenv
+import sys
 dotenv.load_dotenv()
 
 logger = get_logger()
 
-app = FastAPI(title="ProtoVideo Worker Service")
+# Remove FastAPI and uvicorn imports and app definition
+# Remove notify_backend_task_started, notify_backend_task_finished, notify_backend_task_failed
+# Only keep process_all_pending_tasks and job mode logic
 
-def notify_backend_task_started(task_id):
-    backend_url = os.environ.get("BACKEND_API_URL", "http://localhost:8080")
-    worker_api_key = os.environ.get("WORKER_API_KEY", "kfoG9qjBBfsoo3GcpMIKjsojQBLCX5WYK_UHCOMatoY")
-    payload = {"task_id": task_id}
-    headers = {"Authorization": f"Bearer {worker_api_key}"}
+def process_all_pending_tasks():
+    import sys
+    from db import get_task_by_id, update_task_status
+    logger.info("[JOB MODE] Starting process_all_pending_tasks...")
+    # Accept task_id as command-line argument (sys.argv[1])
+    if len(sys.argv) < 2:
+        logger.error("[JOB MODE] No task_id provided. Usage: JOB_MODE=1 python main_worker.py <task_id>")
+        sys.exit(1)
+    task_id = sys.argv[1]
+    logger.info(f"[JOB MODE] Processing task_id: {task_id}")
+    task = get_task_by_id(task_id)
+    if not task:
+        logger.error(f"[JOB MODE] Task not found: {task_id}")
+        sys.exit(1)
+    if getattr(task, 'status', None) == 'finished':
+        logger.info(f"[JOB MODE] Task {task_id} already finished.")
+        sys.exit(1)
     try:
-        response = requests.post(f"{backend_url}/worker/task-started", json=payload, headers=headers)
-        logger.info(f"Task started webhook response: {response.status_code}, {response.text}", extra={"task_id": task_id})
+        from video_generator.generator import generate_video_core
+        payload = task.request_payload
+        logger.info(f"[JOB MODE] Generating video for task {task_id}...")
+        result = generate_video_core(payload, task_id=task_id)
+        update_task_status(task_id, 'finished', result=result)
+        logger.info(f"[JOB MODE] Task {task_id} finished. Result: {result}")
+        sys.exit(0)
     except Exception as e:
-        logger.error(f"Failed to notify backend of task started: {str(e)}", extra={"task_id": task_id})
+        logger.error(f"[JOB MODE] Error processing task {task_id}: {e}")
+        update_task_status(task_id, 'failed', error=str(e))
+        sys.exit(2)
 
-def notify_backend_task_finished(task_id, video_url):
-    backend_url = os.environ.get("BACKEND_API_URL", "http://localhost:8080")
-    worker_api_key = os.environ.get("WORKER_API_KEY", "kfoG9qjBBfsoo3GcpMIKjsojQBLCX5WYK_UHCOMatoY")
-    payload = {
-        "task_id": task_id,
-        "video_url": video_url
-    }
-    headers = {"Authorization": f"Bearer {worker_api_key}"}
-    try:
-        response = requests.post(f"{backend_url}/worker/task-finished", json=payload, headers=headers)
-        logger.info(f"Task finished webhook response: {response.status_code}, {response.text}", extra={"task_id": task_id})
-    except Exception as e:
-        logger.error(f"Failed to notify backend of finished task: {str(e)}", extra={"task_id": task_id})
-
-def notify_backend_task_failed(task_id, error):
-    backend_url = os.environ.get("BACKEND_API_URL", "http://localhost:8080")
-    worker_api_key = os.environ.get("WORKER_API_KEY", "kfoG9qjBBfsoo3GcpMIKjsojQBLCX5WYK_UHCOMatoY")
-    payload = {"task_id": task_id, "error": error}
-    headers = {"Authorization": f"Bearer {worker_api_key}"}
-    try:
-        response = requests.post(f"{backend_url}/worker/task-failed", json=payload, headers=headers)
-        logger.info(f"Task failed webhook response: {response.status_code}, {response.text}", extra={"task_id": task_id})
-    except Exception as e:
-        logger.error(f"Failed to notify backend of task failed: {str(e)}", extra={"task_id": task_id})
-
-@app.post("/process-task")
-async def process_task(request: Request):
-    """
-    Receives a video generation task.
-    The request_dict can include an optional 'audio_prompt_url' for global narration.
-    Example payload:
-    {
-        "task_id": "...",
-        "request_dict": {
-            "output_filename": "...",
-            "scenes": [...],
-            "narration_text": "...",
-            "audio_prompt_url": "https://.../file.wav"  # Optional
-        }
-    }
-    """
-    payload = await request.json()
-    task_id = payload["task_id"]
-    request_dict = payload["request_dict"]
-    try:
-        notify_backend_task_started(task_id)
-        # No direct DB update; rely on webhook
-        result = generate_video_core(request_dict, task_id=task_id)
-        video_url = result.get("r2_url")
-        if video_url:
-            notify_backend_task_finished(task_id, video_url)
-        return {"status": "finished", "result": result}
-    except Exception as e:
-        notify_backend_task_failed(task_id, str(e))
-        return {"status": "failed", "error": str(e)} 
+if __name__ == "__main__":
+    import sys
+    if len(sys.argv) < 2:
+        print("[ERROR] Usage: python main_worker.py <task_id>")
+        sys.exit(1)
+    process_all_pending_tasks() 

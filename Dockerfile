@@ -22,8 +22,7 @@ RUN mkdir -p /tmp/generated_videos && chown appuser:appuser /tmp/generated_video
 
 USER appuser
 
-# Expose FastAPI port
-EXPOSE 8080
+RUN python -c "from chatterbox.tts import ChatterboxTTS; model = ChatterboxTTS.from_pretrained(device='cpu'); wav = model.generate('test audio'); print('Test audio generated')"
 
 # Default command: run FastAPI app with uvicorn
-CMD ["uvicorn", "main_worker:app", "--host", "0.0.0.0", "--port", "8080"] 
+CMD ["python", "main_worker.py"]

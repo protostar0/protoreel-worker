@@ -252,3 +252,24 @@ To start a video generation task, make a `POST` request to `/process-task` with 
 
 ## Contact
 For support, contact the ProtoReel team. 
+
+## Running as a Cloud Run Service (HTTP API)
+
+- Default mode: starts FastAPI app for HTTP requests (e.g., /process-task)
+- Deploy as a Cloud Run Service as usual
+
+## Running as a Cloud Run Job (Batch Mode)
+
+- Set the environment variable `JOB_MODE=1` **or** pass `--job` as a command-line argument
+- The worker will process all pending tasks from the DB/queue and then exit
+- Example:
+  ```sh
+  gcloud run jobs execute video-worker-job --region=YOUR_REGION --set-env-vars=JOB_MODE=1
+  ```
+- Implement your batch logic in `process_all_pending_tasks()` in `main_worker.py`
+
+## How to Implement Batch Processing
+
+- In `main_worker.py`, fill in `process_all_pending_tasks()` to fetch and process tasks from your DB or queue
+- For each task, call `generate_video_core(payload, task_id=...)`
+- Update task status/results as needed 

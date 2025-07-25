@@ -6,12 +6,20 @@ if USE_SQL_DB:
     from datetime import datetime
     from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, JSON
     from sqlalchemy.orm import sessionmaker, declarative_base
-    from sqlalchemy.exc import IntegrityError
+    from sqlalchemy.exc import IntegrityError, OperationalError, DBAPIError
+    from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
     DATABASE_URL = os.environ.get('DATABASE_URL', 'postgresql://postgres.evfdzesqvqwtcwxdiaar:Protovideo%402025@aws-0-eu-north-1.pooler.supabase.com:6543/postgres')
     engine = create_engine(DATABASE_URL, echo=False, future=True)
     SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
     Base = declarative_base()
+
+    retry_on_transient = retry(
+        reraise=True,
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=10),
+        retry=retry_if_exception_type((OperationalError, DBAPIError))
+    )
 
     class User(Base):
         __tablename__ = 'users'
@@ -111,6 +119,7 @@ if USE_SQL_DB:
         finally:
             db.close()
 
+    @retry_on_transient
     def update_task_status(task_id: str, status: str, result: dict = None, error: str = None):
         db = SessionLocal()
         try:
@@ -127,6 +136,7 @@ if USE_SQL_DB:
         finally:
             db.close()
 
+    @retry_on_transient
     def get_task_by_id(task_id: str):
         db = SessionLocal()
         try:
