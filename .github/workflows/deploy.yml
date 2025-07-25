@@ -43,5 +43,5 @@ jobs:
             --image gcr.io/${{ secrets.GCP_PROJECT }}/${{ secrets.GCR_IMAGE_NAME }}:latest \
             --region ${{ secrets.GCP_REGION }} \
             --memory=4Gi --cpu=2 \
-            --set-env-vars="DATABASE_URL=${{ secrets.DATABASE_URL }},R2_BUCKET_NAME=${{ secrets.R2_BUCKET_NAME }},OTHER_ENV=..."
+            --set-env-vars="${{ secrets.WORKER_ENV }}"
       # This step deploys or updates a Cloud Run Job, not a Service.
