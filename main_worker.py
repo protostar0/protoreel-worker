@@ -33,6 +33,7 @@ def process_all_pending_tasks():
     if getattr(task, 'status', None) == 'finished':
         logger.info(f"[JOB MODE] Task {task_id} already finished.")
         sys.exit(1)
+    update_task_status(task_id, 'inprogress')
     try:
         from video_generator.generator import generate_video_core
         payload = task.request_payload
