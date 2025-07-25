@@ -22,4 +22,4 @@ COPY . .
 USER appuser
 
 # Run the worker
-CMD ["python", "main_worker.py"]
+ENTRYPOINT ["python", "main_worker.py"]
