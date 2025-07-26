@@ -39,6 +39,7 @@ class SceneInput(BaseModel):
     video: Optional[str] = None
     narration: Optional[str] = None
     narration_text: Optional[str] = None
+    audio_prompt_url: Optional[str] = None
     music: Optional[str] = None
     duration: int
     text: Optional[TextOverlay] = None
