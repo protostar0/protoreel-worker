@@ -40,6 +40,8 @@ if USE_SQL_DB:
         request_payload = Column(JSON, nullable=True)
         created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
         updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+        started_at = Column(DateTime, nullable=True)
+        finished_at = Column(DateTime, nullable=True)
 
     def init_db():
         Base.metadata.create_all(bind=engine)
@@ -131,6 +133,13 @@ if USE_SQL_DB:
                 task.result = result
             if error is not None:
                 task.error = error
+            
+            # Set timestamps based on status
+            if status == 'inprogress' and task.started_at is None:
+                task.started_at = datetime.utcnow()
+            elif status in ['finished', 'failed'] and task.finished_at is None:
+                task.finished_at = datetime.utcnow()
+            
             db.commit()
             return task
         finally:
@@ -147,6 +156,7 @@ if USE_SQL_DB:
 else:
     print("[user_db] Using in-memory DB for user/task storage (local test mode)")
     import secrets
+    from datetime import datetime
     _users = {}
     _tasks = {}
 
@@ -194,6 +204,8 @@ else:
             "result": None,
             "error": None,
             "request_payload": request_payload,
+            "started_at": None,
+            "finished_at": None,
         }
         return _tasks[task_id]
 
@@ -204,6 +216,13 @@ else:
                 _tasks[task_id]["result"] = result
             if error is not None:
                 _tasks[task_id]["error"] = error
+            
+            # Set timestamps based on status
+            if status == 'inprogress' and _tasks[task_id]["started_at"] is None:
+                _tasks[task_id]["started_at"] = datetime.utcnow()
+            elif status in ['finished', 'failed'] and _tasks[task_id]["finished_at"] is None:
+                _tasks[task_id]["finished_at"] = datetime.utcnow()
+            
             return _tasks[task_id]
         return None
 
