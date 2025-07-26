@@ -163,7 +163,8 @@ class PerformanceOptimizer:
             import shutil
             
             # Clear local cache directory
-            local_cache_dir = os.path.join(os.getcwd(), "cache")
+            from video_generator.config import Config
+            local_cache_dir = os.path.join(Config.TEMP_DIR, "cache")
             if os.path.exists(local_cache_dir):
                 try:
                     shutil.rmtree(local_cache_dir)
@@ -171,11 +172,11 @@ class PerformanceOptimizer:
                 except Exception as e:
                     logger.warning(f"[CACHE] Failed to clear local cache directory: {e}")
             
-            # Clear any .pkl files in current directory
-            current_dir = os.getcwd()
-            for file in os.listdir(current_dir):
+            # Clear any .pkl files in temp directory
+            temp_dir = Config.TEMP_DIR
+            for file in os.listdir(temp_dir):
                 if file.endswith('.pkl'):
-                    file_path = os.path.join(current_dir, file)
+                    file_path = os.path.join(temp_dir, file)
                     try:
                         os.remove(file_path)
                         logger.info(f"[CACHE] Removed local cache file: {file}")

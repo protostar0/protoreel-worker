@@ -43,20 +43,21 @@ def clear_cache():
                     except Exception as e:
                         logger.warning(f"[CACHE] Failed to remove temp cache file {file}: {e}")
         
-        # Clear local cache directory (protovideo-worker/cache/)
-        local_cache_dir = os.path.join(os.getcwd(), "cache")
-        if os.path.exists(local_cache_dir):
-            try:
-                shutil.rmtree(local_cache_dir)
-                logger.info("[CACHE] Cleared local cache directory")
-            except Exception as e:
-                logger.warning(f"[CACHE] Failed to clear local cache directory: {e}")
-        
-        # Also clear any .pkl files in current directory
-        current_dir = os.getcwd()
-        for file in os.listdir(current_dir):
-            if file.endswith('.pkl'):
-                file_path = os.path.join(current_dir, file)
+                    # Clear local cache directory (protovideo-worker/cache/)
+            from video_generator.config import Config
+            local_cache_dir = os.path.join(Config.TEMP_DIR, "cache")
+            if os.path.exists(local_cache_dir):
+                try:
+                    shutil.rmtree(local_cache_dir)
+                    logger.info("[CACHE] Cleared local cache directory")
+                except Exception as e:
+                    logger.warning(f"[CACHE] Failed to clear local cache directory: {e}")
+
+                        # Also clear any .pkl files in temp directory
+            temp_dir = Config.TEMP_DIR
+            for file in os.listdir(temp_dir):
+                if file.endswith('.pkl'):
+                    file_path = os.path.join(temp_dir, file)
                 try:
                     os.remove(file_path)
                     logger.info(f"[CACHE] Removed local cache file: {file}")
