@@ -2,6 +2,9 @@ import openai
 import requests
 import os
 import time
+import logging
+
+logger = logging.getLogger(__name__)
 
 def generate_image_from_prompt(prompt, api_key, out_path="generated_image.png", retries=3, delay=5):
     """
@@ -32,13 +35,13 @@ def generate_image_from_prompt(prompt, api_key, out_path="generated_image.png", 
 if __name__ == "__main__":
     import sys
     if len(sys.argv) < 2:
-        print("Usage: python -m video_generator.generate_image 'your prompt here' [output_path]")
+        logger.error("Usage: python -m video_generator.generate_image 'your prompt here' [output_path]")
         exit(1)
     prompt = sys.argv[1]
     out_path = sys.argv[2] if len(sys.argv) > 2 else "generated_image.png"
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
-        print("Set OPENAI_API_KEY env variable.")
+        logger.error("Set OPENAI_API_KEY env variable.")
         exit(1)
     out_path = generate_image_from_prompt(prompt, api_key, out_path)
-    print(f"Image saved to {out_path}") 
+    logger.info(f"Image saved to {out_path}") 

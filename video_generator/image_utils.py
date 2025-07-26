@@ -8,8 +8,11 @@ import uuid
 import requests
 import logging
 from video_generator.generate_image import generate_image_from_prompt as _generate_image_from_prompt
+from video_generator.freepik_api import generate_image_from_prompt_freepik
+from video_generator.gemini_api import generate_image_from_prompt_gemini
 from video_generator.config import Config
 
+logger = logging.getLogger(__name__)
 TEMP_DIR = Config.TEMP_DIR
 
 def download_asset(url_or_path: str) -> str:
@@ -39,9 +42,26 @@ def download_asset(url_or_path: str) -> str:
         logger.error(f"Asset not found: {url_or_path}")
         raise RuntimeError(f"[400] Asset not found: {url_or_path}")
 
-def generate_image_from_prompt(prompt: str, api_key: str, out_path: str) -> str:
+def generate_image_from_prompt(prompt: str, api_key: str, out_path: str, provider: str = "openai") -> str:
     """
-    Generate an image from a text prompt using OpenAI API and save to out_path.
-    Returns the path to the generated image.
+    Generate an image from a text prompt using the specified provider API and save to out_path.
+    
+    Args:
+        prompt: Text prompt for image generation
+        api_key: API key for the provider (ignored for gemini)
+        out_path: Path to save the generated image
+        provider: Image generation provider ("openai", "freepik", or "gemini")
+        
+    Returns:
+        Path to the generated image
     """
-    return _generate_image_from_prompt(prompt, api_key, out_path) 
+    logger.info(f"Generating image with {provider} API. Prompt: {prompt[:50]}...")
+    
+    if provider.lower() == "freepik":
+        return generate_image_from_prompt_freepik(prompt, api_key, out_path)
+    elif provider.lower() == "openai":
+        return _generate_image_from_prompt(prompt, api_key, out_path)
+    elif provider.lower() == "gemini":
+        return generate_image_from_prompt_gemini(prompt, out_path)
+    else:
+        raise ValueError(f"Unsupported image generation provider: {provider}. Supported providers: openai, freepik, gemini") 

@@ -23,12 +23,34 @@ def test_worker_job_mode():
     task_id = str(uuid.uuid4())
     user_api_key = "test_api_key"
     payload = {
-        "output_filename": "test_google_run_job.mp4",
+        "output_filename": "test_worker_video2.mp4",
         "scenes": [
             {
                 "type": "image",
-                "narration_text": "Test google run job.",
-                "promptImage": "A test image.",
+                "narration_text": "In a monumental announcement, President Donald Trump has revealed a massive trade deal with Japan, calling it the 'largest deal in history with Japan.' This landmark agreement promises to reshape global economic partnerships.",
+                "promptImage": "A photo-realistic image of President holding a press conference with the flags of the United States and Japan in the background, emphasizing a momentous announcement.",
+                "image_provider": "gemini",
+                "subtitle": True
+            },
+            {
+                "type": "image",
+                "narration_text": "The deal includes a staggering $550 billion investment from Japan into the United States. This infusion of funds is expected to boost various sectors and create numerous jobs, potentially strengthening ties between the two nations.",
+                "promptImage": "A photo-realistic image of a bustling New York City skyline with symbolic dollar signs and yen symbols overlayed, representing financial investment.",
+                "image_provider": "gemini",
+                "subtitle": True
+            },
+            {
+                "type": "image",
+                "narration_text": "Both countries will implement a 15% tariff on each other's goods, including crucial sectors such as vehicles and agricultural products. While this aims to level the playing field, experts warn to carefully evaluate its long-term benefits.",
+                "promptImage": "A photo-realistic image of shipping containers at a busy port with agricultural products and cars visible, representing international trade and tariffs.",
+                "image_provider": "gemini",
+                "subtitle": True
+            },
+            {
+                "type": "image",
+                "narration_text": "As full details of the agreement are still unfolding, stay tuned for updates. Follow the hashtags #USJapanDeal and #TrumpTradeDeal for the latest news. Experts continue to analyze the potential impacts on global business dynamics.",
+                "promptImage": "A photo-realistic image of a group of analysts in an office with a world map and international news screens visible, symbolizing ongoing discussions and evaluations.",
+                "image_provider": "gemini",
                 "subtitle": True
             }
         ]
@@ -73,24 +95,28 @@ def test_worker_process_task():
                 "type": "image",
                 "narration_text": "In a monumental announcement, President Donald Trump has revealed a massive trade deal with Japan, calling it the 'largest deal in history with Japan.' This landmark agreement promises to reshape global economic partnerships.",
                 "promptImage": "A photo-realistic image of President holding a press conference with the flags of the United States and Japan in the background, emphasizing a momentous announcement.",
+                "image_provider": "gemini",
                 "subtitle": True
             },
             {
                 "type": "image",
                 "narration_text": "The deal includes a staggering $550 billion investment from Japan into the United States. This infusion of funds is expected to boost various sectors and create numerous jobs, potentially strengthening ties between the two nations.",
                 "promptImage": "A photo-realistic image of a bustling New York City skyline with symbolic dollar signs and yen symbols overlayed, representing financial investment.",
+                "image_provider": "gemini",
                 "subtitle": True
             },
             {
                 "type": "image",
                 "narration_text": "Both countries will implement a 15% tariff on each other's goods, including crucial sectors such as vehicles and agricultural products. While this aims to level the playing field, experts warn to carefully evaluate its long-term benefits.",
                 "promptImage": "A photo-realistic image of shipping containers at a busy port with agricultural products and cars visible, representing international trade and tariffs.",
+                "image_provider": "gemini",
                 "subtitle": True
             },
             {
                 "type": "image",
                 "narration_text": "As full details of the agreement are still unfolding, stay tuned for updates. Follow the hashtags #USJapanDeal and #TrumpTradeDeal for the latest news. Experts continue to analyze the potential impacts on global business dynamics.",
                 "promptImage": "A photo-realistic image of a group of analysts in an office with a world map and international news screens visible, symbolizing ongoing discussions and evaluations.",
+                "image_provider": "gemini",
                 "subtitle": True
             }
         ]

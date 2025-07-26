@@ -20,5 +20,7 @@ class Config:
     # Video settings
     REEL_SIZE = (1080, 1920)
     FPS = 24
+    # Image generation settings
+    DEFAULT_IMAGE_PROVIDER = os.environ.get("DEFAULT_IMAGE_PROVIDER", "gemini")
     # API Key for your service
     API_KEY = os.environ.get("PROTOVIDEO_API_KEY", "N8S6R_TydmHr58LoUzYZf9v2gRkcfWZemz1zWZ5WMkE") 

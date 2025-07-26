@@ -35,6 +35,7 @@ class SceneInput(BaseModel):
     type: str
     image: Optional[str] = None
     promptImage: Optional[str] = None
+    image_provider: Optional[str] = "openai"  # "openai", "freepik", or "gemini"
     video: Optional[str] = None
     narration: Optional[str] = None
     narration_text: Optional[str] = None
@@ -42,6 +43,12 @@ class SceneInput(BaseModel):
     duration: int
     text: Optional[TextOverlay] = None
     subtitle: bool = False
+    """
+    image_provider:
+        - "openai": Use OpenAI DALL-E
+        - "freepik": Use Freepik AI Mystic
+        - "gemini": Use Google Gemini
+    """
 
 def render_scene(scene: SceneInput, use_global_narration: bool = False, task_id: Optional[str] = None) -> (str, List[str]):
     """
@@ -65,14 +72,29 @@ def render_scene(scene: SceneInput, use_global_narration: bool = False, task_id:
                 logger.error(f"Failed to download image asset: {e}", exc_info=True, extra={"task_id": task_id})
                 raise
         elif scene.promptImage:
-            api_key = os.environ.get("OPENAI_API_KEY")
-            if not api_key:
-                logger.error("OPENAI_API_KEY environment variable not set.", extra={"task_id": task_id})
-                raise RuntimeError("OPENAI_API_KEY environment variable not set.")
+            # Determine which API to use based on provider
+            provider = getattr(scene, 'image_provider', Config.DEFAULT_IMAGE_PROVIDER).lower()
+            
+            if provider == "freepik":
+                api_key = os.environ.get("FREEPIK_API_KEY")
+                if not api_key:
+                    logger.error("FREEPIK_API_KEY environment variable not set.", extra={"task_id": task_id})
+                    raise RuntimeError("FREEPIK_API_KEY environment variable not set.")
+            elif provider == "openai":
+                api_key = os.environ.get("OPENAI_API_KEY")
+                if not api_key:
+                    logger.error("OPENAI_API_KEY environment variable not set.", extra={"task_id": task_id})
+                    raise RuntimeError("OPENAI_API_KEY environment variable not set.")
+            elif provider == "gemini":
+                api_key = None  # Gemini does not require an API key here
+            else:
+                logger.error(f"Unsupported image provider: {provider}", extra={"task_id": task_id})
+                raise RuntimeError(f"Unsupported image provider: {provider}")
+            
             out_path = os.path.join(tempfile.gettempdir(), f"generated_{uuid.uuid4().hex}.png")
             try:
-                logger.info(f"Generating image from prompt: {scene.promptImage}", extra={"task_id": task_id})
-                image_path = generate_image_from_prompt(scene.promptImage, api_key, out_path)
+                logger.info(f"Generating image from prompt using {provider}: {scene.promptImage}", extra={"task_id": task_id})
+                image_path = generate_image_from_prompt(scene.promptImage, api_key, out_path, provider=provider)
                 temp_files.append(image_path)
                 logger.info(f"Generated image from prompt: {image_path}", extra={"task_id": task_id})
             except Exception as e:
