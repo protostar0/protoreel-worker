@@ -42,5 +42,5 @@ jobs:
         || gcloud run jobs create "${{ secrets.CLOUD_RUN_JOB }}" \
             --image gcr.io/${{ secrets.GCP_PROJECT }}/${{ secrets.GCR_IMAGE_NAME }}:latest \
             --region ${{ secrets.GCP_REGION }} \
-            --memory=16Gi --cpu=4 \
+            --memory=16Gi --cpu=4 
       # This step deploys or updates a Cloud Run Job, not a Service.
