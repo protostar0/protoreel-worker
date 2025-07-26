@@ -24,13 +24,16 @@ def clear_cache():
         import shutil
         import os
         from video_generator.config import Config
-        
+
         # Clear cache in temp directory
         cache_dir = os.path.join(Config.TEMP_DIR, "cache")
         if os.path.exists(cache_dir):
-            shutil.rmtree(cache_dir)
-            logger.info("[CACHE] Cleared temp cache directory")
-        
+            try:
+                shutil.rmtree(cache_dir)
+                logger.info("[CACHE] Cleared temp cache directory")
+            except Exception as e:
+                logger.warning(f"[CACHE] Failed to clear temp cache directory: {e}")
+
         # Also clear any .pkl files in temp directory
         temp_dir = Config.TEMP_DIR
         if os.path.exists(temp_dir):
@@ -42,36 +45,53 @@ def clear_cache():
                         logger.info(f"[CACHE] Removed temp cache file: {file}")
                     except Exception as e:
                         logger.warning(f"[CACHE] Failed to remove temp cache file {file}: {e}")
-        
-                    # Clear local cache directory (protovideo-worker/cache/)
-            from video_generator.config import Config
-            local_cache_dir = os.path.join(Config.TEMP_DIR, "cache")
-            if os.path.exists(local_cache_dir):
-                try:
-                    shutil.rmtree(local_cache_dir)
-                    logger.info("[CACHE] Cleared local cache directory")
-                except Exception as e:
-                    logger.warning(f"[CACHE] Failed to clear local cache directory: {e}")
 
-                        # Also clear any .pkl files in temp directory
-            temp_dir = Config.TEMP_DIR
-            for file in os.listdir(temp_dir):
-                if file.endswith('.pkl'):
-                    file_path = os.path.join(temp_dir, file)
+        # Clear local cache directory (protovideo-worker/cache/)
+        from video_generator.config import Config
+        local_cache_dir = os.path.join(Config.TEMP_DIR, "cache")
+        if os.path.exists(local_cache_dir):
+            try:
+                shutil.rmtree(local_cache_dir)
+                logger.info("[CACHE] Cleared local cache directory")
+            except Exception as e:
+                logger.warning(f"[CACHE] Failed to clear local cache directory: {e}")
+
+        # Also clear any .pkl files in temp directory
+        temp_dir = Config.TEMP_DIR
+        for file in os.listdir(temp_dir):
+            if file.endswith('.pkl'):
+                file_path = os.path.join(temp_dir, file)
                 try:
                     os.remove(file_path)
                     logger.info(f"[CACHE] Removed local cache file: {file}")
                 except Exception as e:
                     logger.warning(f"[CACHE] Failed to remove local cache file {file}: {e}")
-        
+
         logger.info("[CACHE] Cache clearing completed")
     except Exception as e:
         logger.error(f"[CACHE] Failed to clear cache: {e}")
 
 def clear_cache_on_completion():
     """Clear cache when task completes (success or failure)."""
+    from video_generator.config import Config
+    
+    # Check if cache clearing is enabled
+    if not Config.ENABLE_CACHE_CLEARING:
+        logger.info("[CACHE] Cache clearing disabled via ENABLE_CACHE_CLEARING=false")
+        return
+    
     try:
-        clear_cache()
+        if Config.CACHE_CLEARING_ASYNC:
+            # Run cache clearing in a separate thread to avoid blocking
+            import threading
+            cache_thread = threading.Thread(target=clear_cache, daemon=True)
+            cache_thread.start()
+            # Don't wait for completion to avoid blocking
+            logger.info("[CACHE] Cache clearing started in background thread")
+        else:
+            # Run cache clearing synchronously
+            clear_cache()
+            logger.info("[CACHE] Cache clearing completed synchronously")
     except Exception as e:
         logger.error(f"[CACHE] Error during cache clearing: {e}")
 
@@ -103,30 +123,83 @@ def signal_handler(signum, frame):
     sys.exit(1)
 
 def memory_monitor():
-    """Monitor memory usage and log warnings only - don't fail tasks."""
+    """Monitor memory usage and proactively clear cache to prevent container termination."""
     global task_failed, failure_reason
+    from video_generator.config import Config
+    
+    # Check if memory monitoring is enabled
+    if not Config.ENABLE_MEMORY_MONITORING:
+        logger.info("[MEMORY] Memory monitoring disabled via ENABLE_MEMORY_MONITORING=false")
+        return
+    
     process = psutil.Process()
+    last_cleanup_time = 0
+    cleanup_cooldown = Config.MEMORY_CLEANUP_COOLDOWN
+    
     while not task_failed:
         try:
             memory_info = process.memory_info()
             memory_mb = memory_info.rss / 1024 / 1024
+            current_time = time.time()
             
-            if memory_mb > 3000:  # Warning at 3GB
+            # Only perform cleanup if enough time has passed since last cleanup
+            if current_time - last_cleanup_time < cleanup_cooldown:
+                time.sleep(15)  # Check less frequently during cooldown
+                continue
+            
+            if memory_mb > Config.MEMORY_WARNING_THRESHOLD_MB:  # Warning threshold
                 logger.warning(f"[MEMORY] High memory usage: {memory_mb:.1f}MB")
+                
+                # Proactively clear cache to prevent container termination
+                if Config.ENABLE_CACHE_CLEARING:
+                    try:
+                        clear_cache_on_completion()
+                        # Force garbage collection
+                        import gc
+                        gc.collect()
+                        last_cleanup_time = current_time
+                        logger.info(f"[MEMORY] Proactively cleared cache and forced GC at {memory_mb:.1f}MB to prevent container termination")
+                    except Exception as e:
+                        logger.error(f"[MEMORY] Failed to clear cache proactively: {e}")
             
-            if memory_mb > 6000:  # Critical warning at 6GB (but don't fail)
-                logger.error(f"[MEMORY] Critical memory usage: {memory_mb:.1f}MB - continuing task")
+            elif memory_mb > Config.MEMORY_CRITICAL_THRESHOLD_MB:  # Critical threshold
+                logger.error(f"[MEMORY] Critical memory usage: {memory_mb:.1f}MB - clearing cache aggressively")
                 
-                # Clear cache on critical memory usage but don't fail
-                try:
-                    clear_cache_on_completion()
-                    logger.info(f"[MEMORY] Cleared cache due to high memory usage")
-                except Exception as e:
-                    logger.error(f"[MEMORY] Failed to clear cache on critical memory: {e}")
+                # Aggressive cache clearing
+                if Config.ENABLE_CACHE_CLEARING:
+                    try:
+                        clear_cache_on_completion()
+                        # Force garbage collection multiple times
+                        import gc
+                        gc.collect()
+                        gc.collect()
+                        last_cleanup_time = current_time
+                        logger.info(f"[MEMORY] Aggressively cleared cache and forced multiple GC at {memory_mb:.1f}MB")
+                    except Exception as e:
+                        logger.error(f"[MEMORY] Failed to clear cache aggressively: {e}")
                 
-                # Continue processing - don't set task_failed = True
+            elif memory_mb > Config.MEMORY_EMERGENCY_THRESHOLD_MB:  # Emergency threshold
+                logger.error(f"[MEMORY] EMERGENCY memory usage: {memory_mb:.1f}MB - emergency cleanup")
                 
-            time.sleep(15)  # Check every 15 seconds
+                # Emergency cleanup
+                if Config.ENABLE_CACHE_CLEARING:
+                    try:
+                        clear_cache_on_completion()
+                        # Force garbage collection multiple times
+                        import gc
+                        gc.collect()
+                        gc.collect()
+                        gc.collect()
+                        # Clear all caches
+                        from video_generator.performance_optimizer import get_performance_optimizer
+                        optimizer = get_performance_optimizer()
+                        optimizer.clear_all_caches()
+                        last_cleanup_time = current_time
+                        logger.info(f"[MEMORY] Emergency cleanup completed at {memory_mb:.1f}MB")
+                    except Exception as e:
+                        logger.error(f"[MEMORY] Failed emergency cleanup: {e}")
+            
+            time.sleep(Config.MEMORY_MONITOR_INTERVAL)  # Use configurable interval
         except Exception as e:
             logger.error(f"[MEMORY] Memory monitoring error: {e}")
             break
@@ -215,6 +288,7 @@ def process_all_pending_tasks():
     with error_recovery_context(task_id):
         try:
             from video_generator.generator import generate_video_core
+            import gc
             
             payload = task.request_payload
             if not payload:
@@ -230,6 +304,10 @@ def process_all_pending_tasks():
             
             if not result:
                 raise ValueError("Video generation returned empty result")
+            
+            # Force garbage collection after video generation
+            gc.collect()
+            logger.info(f"[JOB MODE] Memory optimized after video generation")
             
             # Update task status to finished
             update_task_status(task_id, 'finished', result=result)

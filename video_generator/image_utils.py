@@ -43,14 +43,27 @@ def download_asset(url_or_path: str) -> str:
         logger.error(f"Asset not found: {url_or_path}")
         raise RuntimeError(f"[400] Asset not found: {url_or_path}")
 
-def generate_cache_key(prompt: str, api_key: str, out_path: str, provider: str = "openai") -> str:
+def generate_cache_key(prompt: str, api_key: str, out_path: str, provider: str = "openai", 
+                      scene_context: dict = None, video_context: dict = None) -> str:
     """Generate a cache key for image generation."""
     import hashlib
-    key_data = f"{prompt}:{provider}:{api_key or 'none'}"
+    import json
+    
+    # Include context in cache key for better differentiation
+    context_data = ""
+    if scene_context:
+        context_data += f":scene_{scene_context.get('scene_index', 0)}_{scene_context.get('total_scenes', 1)}"
+    if video_context:
+        # Include a hash of video context to avoid very long cache keys
+        video_context_str = json.dumps(video_context, sort_keys=True)
+        context_data += f":video_{hashlib.md5(video_context_str.encode()).hexdigest()[:8]}"
+    
+    key_data = f"{prompt}:{provider}:{api_key or 'none'}{context_data}"
     return hashlib.md5(key_data.encode()).hexdigest()
 
 @cache_result(generate_cache_key)
-def generate_image_from_prompt(prompt: str, api_key: str, out_path: str, provider: str = "openai") -> str:
+def generate_image_from_prompt(prompt: str, api_key: str, out_path: str, provider: str = "openai", 
+                             scene_context: dict = None, video_context: dict = None) -> str:
     """
     Generate an image from a text prompt using the specified provider API and save to out_path.
     Results are cached to avoid regenerating the same images.
@@ -60,6 +73,8 @@ def generate_image_from_prompt(prompt: str, api_key: str, out_path: str, provide
         api_key: API key for the provider (ignored for gemini)
         out_path: Path to save the generated image
         provider: Image generation provider ("openai", "freepik", or "gemini")
+        scene_context: Additional context about the scene (scene_index, total_scenes, etc.)
+        video_context: Context about the entire video (theme, narration_text, etc.)
         
     Returns:
         Path to the generated image
@@ -75,7 +90,9 @@ def generate_image_from_prompt(prompt: str, api_key: str, out_path: str, provide
         elif provider.lower() == "openai":
             return _generate_image_from_prompt(prompt, api_key, out_path)
         elif provider.lower() == "gemini":
-            return generate_image_from_prompt_gemini(prompt, out_path)
+            return generate_image_from_prompt_gemini(prompt, out_path, 
+                                                   scene_context=scene_context, 
+                                                   video_context=video_context)
         else:
             raise ValueError(f"Unsupported image generation provider: {provider}. Supported providers: openai, freepik, gemini")
     

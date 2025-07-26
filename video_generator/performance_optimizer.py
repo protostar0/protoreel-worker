@@ -130,6 +130,9 @@ class PerformanceOptimizer:
         cache_path = self.get_cache_path(cache_key)
         
         try:
+            # Ensure cache directory exists
+            os.makedirs(os.path.dirname(cache_path), exist_ok=True)
+            
             with open(cache_path, 'wb') as f:
                 pickle.dump(result, f)
             logger.info(f"[CACHE] Cached result for key {cache_key}")
@@ -199,21 +202,32 @@ class PerformanceOptimizer:
             logger.error(f"[CACHE] Failed to clear caches: {e}")
 
     def optimize_memory(self):
-        """Conservative memory optimization to avoid breaking TTS models - permissive mode."""
+        """Aggressive memory optimization to prevent container termination."""
         try:
-            # Force garbage collection
+            # Force garbage collection multiple times
+            gc.collect()
             gc.collect()
             
-            # Only clear matplotlib cache if used (safe)
+            # Clear matplotlib cache if used (safe)
             try:
                 import matplotlib.pyplot as plt
                 plt.close('all')
             except:
                 pass
             
-            # Don't clear numpy or other modules that might break TTS
-            # Don't clear import cache for heavy modules
-            # Don't clear MoviePy internal caches
+            # Clear PIL cache
+            try:
+                from PIL import Image
+                Image.core.clear_cache()
+            except:
+                pass
+            
+            # Clear numpy cache
+            try:
+                import numpy as np
+                np.core.multiarray._get_ndarray_c_version.cache_clear()
+            except:
+                pass
             
             # Force memory cleanup
             import psutil
@@ -226,9 +240,9 @@ class PerformanceOptimizer:
             memory_after = process.memory_info().rss / 1024 / 1024
             freed_memory = memory_before - memory_after
             
-            # Only log if significant memory was freed
-            if freed_memory > 50:  # Only log if more than 50MB was freed
-                logger.info(f"[MEMORY] Conservative memory optimization. Freed: {freed_memory:.1f}MB")
+            # Log memory optimization results
+            if freed_memory > 10:  # Log if more than 10MB was freed
+                logger.info(f"[MEMORY] Aggressive memory optimization. Freed: {freed_memory:.1f}MB")
             
         except Exception as e:
             logger.warning(f"[MEMORY] Memory optimization failed: {e}")

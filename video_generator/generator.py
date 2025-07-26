@@ -52,10 +52,18 @@ class SceneInput(BaseModel):
         - "gemini": Use Google Gemini
     """
 
-def render_scene(scene: SceneInput, use_global_narration: bool = False, task_id: Optional[str] = None) -> (str, List[str]):
+def render_scene(scene: SceneInput, use_global_narration: bool = False, task_id: Optional[str] = None, 
+                scene_context: dict = None, video_context: dict = None) -> (str, List[str]):
     """
     Render a single scene (image or video) with optional narration, music, and subtitles.
     Returns the path to the rendered scene video and a list of temp files to clean up.
+    
+    Args:
+        scene: Scene input data
+        use_global_narration: Whether to use global narration
+        task_id: Task ID for logging
+        scene_context: Additional context about the scene (scene_index, total_scenes, etc.)
+        video_context: Context about the entire video (theme, narration_text, etc.)
     """
     logger.info(f"Rendering scene: {scene}", extra={"task_id": task_id})
     temp_files = []
@@ -96,7 +104,7 @@ def render_scene(scene: SceneInput, use_global_narration: bool = False, task_id:
             out_path = os.path.join(tempfile.gettempdir(), f"generated_{uuid.uuid4().hex}.png")
             try:
                 logger.info(f"Generating image from prompt using {provider}: {scene.promptImage}", extra={"task_id": task_id})
-                image_path = generate_image_from_prompt(scene.promptImage, api_key, out_path, provider=provider)
+                image_path = generate_image_from_prompt(scene.promptImage, api_key, out_path, provider=provider, scene_context=scene_context, video_context=video_context)
                 temp_files.append(image_path)
                 logger.info(f"Generated image from prompt: {image_path}", extra={"task_id": task_id})
             except Exception as e:
@@ -230,39 +238,71 @@ def render_scene(scene: SceneInput, use_global_narration: bool = False, task_id:
             logger.info(f"Exporting scene to {scene_output}", extra={"task_id": task_id})
             
             # Determine optimal codec based on hardware acceleration
-            codec = "libx264"  # Default
+            codec = "libx264"  # Default safe codec
             if Config.USE_HARDWARE_ACCELERATION and Config.AUTO_DETECT_HARDWARE:
-                # Try to detect hardware acceleration
+                # Try to detect hardware acceleration with better error handling
                 import subprocess
                 try:
-                    result = subprocess.run(['ffmpeg', '-encoders'], capture_output=True, text=True)
-                    if 'h264_nvenc' in result.stdout:
+                    result = subprocess.run(['ffmpeg', '-encoders'], capture_output=True, text=True, timeout=10)
+                    if result.returncode == 0 and 'h264_nvenc' in result.stdout:
                         codec = 'h264_nvenc'
-                    elif 'h264_qsv' in result.stdout:
+                        logger.info("Using NVIDIA hardware acceleration (h264_nvenc)", extra={"task_id": task_id})
+                    elif result.returncode == 0 and 'h264_qsv' in result.stdout:
                         codec = 'h264_qsv'
+                        logger.info("Using Intel QuickSync hardware acceleration (h264_qsv)", extra={"task_id": task_id})
                     else:
                         codec = 'libx264'
-                except:
+                        logger.info("Using software encoding (libx264) - hardware acceleration not available", extra={"task_id": task_id})
+                except (subprocess.TimeoutExpired, FileNotFoundError, Exception) as e:
                     codec = 'libx264'
+                    logger.warning(f"Hardware acceleration detection failed, using software encoding: {e}", extra={"task_id": task_id})
             elif Config.FFMPEG_HWACCEL != "auto":
                 codec = Config.FFMPEG_HWACCEL
+                logger.info(f"Using configured hardware acceleration: {codec}", extra={"task_id": task_id})
+            else:
+                logger.info("Using software encoding (libx264)", extra={"task_id": task_id})
             
             # Use optimal threads for encoding
             threads = min(Config.SCENE_RENDERING_THREADS, os.cpu_count() or 4)
             
-            video_clip.write_videofile(
-                scene_output,
-                fps=24,
-                codec=codec,
-                audio_codec="aac",
-                temp_audiofile=f"{scene_output}.temp_audio.m4a",
-                remove_temp=True,
-                logger=None,
-                threads=threads,
-                preset=Config.SCENE_RENDERING_PRESET,
-                bitrate=Config.FFMPEG_BITRATE,
-                ffmpeg_params=['-crf', str(Config.FFMPEG_CRF)] if Config.FFMPEG_CRF else None
-            )
+            # Add error handling for video export
+            try:
+                video_clip.write_videofile(
+                    scene_output,
+                    fps=24,
+                    codec=codec,
+                    audio_codec="aac",
+                    temp_audiofile=f"{scene_output}.temp_audio.m4a",
+                    remove_temp=True,
+                    logger=None,
+                    threads=threads,
+                    preset=Config.SCENE_RENDERING_PRESET,
+                    bitrate=Config.FFMPEG_BITRATE,
+                    ffmpeg_params=['-crf', str(Config.FFMPEG_CRF)] if Config.FFMPEG_CRF else None
+                )
+            except Exception as e:
+                # If hardware acceleration fails, fallback to software encoding
+                if codec != 'libx264':
+                    logger.warning(f"Hardware acceleration failed with {codec}, falling back to software encoding: {e}", extra={"task_id": task_id})
+                    try:
+                        video_clip.write_videofile(
+                            scene_output,
+                            fps=24,
+                            codec='libx264',
+                            audio_codec="aac",
+                            temp_audiofile=f"{scene_output}.temp_audio.m4a",
+                            remove_temp=True,
+                            logger=None,
+                            threads=threads,
+                            preset=Config.SCENE_RENDERING_PRESET,
+                            bitrate=Config.FFMPEG_BITRATE,
+                            ffmpeg_params=['-crf', str(Config.FFMPEG_CRF)] if Config.FFMPEG_CRF else None
+                        )
+                    except Exception as fallback_error:
+                        logger.error(f"Both hardware and software encoding failed: {fallback_error}", exc_info=True, extra={"task_id": task_id})
+                        raise
+                else:
+                    raise
             temp_files.append(scene_output)
             video_clip.close()
             del video_clip
@@ -285,6 +325,9 @@ def generate_video_core(request_dict, task_id=None):
     if task_id:
         optimizer.start_performance_monitoring(task_id)
     
+    # Log hardware settings for debugging
+    Config.log_hardware_settings()
+    
     # Run batch optimizations for better performance
     optimizer.batch_optimize()
     
@@ -305,6 +348,10 @@ def generate_video_core(request_dict, task_id=None):
             # Generate global narration if needed
             if use_global_narration:
                 try:
+                    # Memory optimization before narration generation
+                    optimizer.optimize_memory()
+                    logger.info("Memory optimized before narration generation", extra={"task_id": task_id})
+                    
                     logger.info(f"Generating global narration.", extra={"task_id": task_id})
                     narration_path = generate_narration(request["narration_text"], audio_prompt_url=global_audio_prompt_url)
                     temp_files.append(narration_path)
@@ -317,9 +364,9 @@ def generate_video_core(request_dict, task_id=None):
                         for scene in request["scenes"]:
                             scene["duration"] = int(round(per_scene_duration))
                     
-                    # Skip memory optimization after narration to avoid interference
-                    # optimizer.optimize_memory()
-                    logger.info("Skipped memory optimization after narration generation", extra={"task_id": task_id})
+                    # Memory optimization after narration generation
+                    optimizer.optimize_memory()
+                    logger.info("Memory optimized after narration generation", extra={"task_id": task_id})
                     
                 except Exception as e:
                     logger.error(f"Failed to generate global narration: {e}", exc_info=True, extra={"task_id": task_id})
@@ -345,15 +392,33 @@ def generate_video_core(request_dict, task_id=None):
                 for idx, scene in enumerate(request["scenes"]):
                     try:
                         logger.info(f"Processing scene {idx+1}/{len(request['scenes'])}", extra={"task_id": task_id})
+                        
+                        # Create scene context
+                        scene_context = {
+                            "scene_index": idx,
+                            "total_scenes": len(request["scenes"]),
+                            "duration": scene.get("duration", 10),
+                            "scene_type": scene.get("type", "image")
+                        }
+                        
+                        # Create video context
+                        video_context = {
+                            "narration_text": request.get("narration_text"),
+                            "theme": request.get("theme"),
+                            "output_filename": request.get("output_filename")
+                        }
+                        
                         scene_file, files_to_clean = process_scene_sequential(
-                            scene, idx, use_global_narration, global_audio_prompt_url, task_id
+                            scene, idx, use_global_narration, global_audio_prompt_url, task_id,
+                            scene_context=scene_context, video_context=video_context
                         )
                         scene_files.append(scene_file)
                         temp_files.extend(files_to_clean)
                         
-                        # Memory optimization after each scene
-                        optimizer.optimize_memory()
-                        logger.info(f"Memory optimized after scene {idx+1}", extra={"task_id": task_id})
+                        # Memory optimization after each scene (configurable frequency)
+                        if Config.ENABLE_MEMORY_OPTIMIZATION and idx % Config.MEMORY_CLEANUP_INTERVAL == 0:
+                            optimizer.optimize_memory()
+                            logger.info(f"Memory optimized after scene {idx+1}", extra={"task_id": task_id})
                         
                     except Exception as e:
                         logger.error(f"Failed to process scene {idx+1}: {e}", exc_info=True, extra={"task_id": task_id})
@@ -362,11 +427,11 @@ def generate_video_core(request_dict, task_id=None):
             # Optimize memory after scene processing
             optimizer.optimize_memory()
             
-            # Additional memory optimization between scenes
-            for i, scene_file in enumerate(scene_files):
-                if i > 0:  # Skip first scene
-                    optimizer.optimize_memory()
-                    logger.info(f"Memory optimized after scene {i+1}", extra={"task_id": task_id})
+            # Remove additional memory optimization between scenes to reduce overhead
+            # for i, scene_file in enumerate(scene_files):
+            #     if i > 0:  # Skip first scene
+            #         optimizer.optimize_memory()
+            #         logger.info(f"Memory optimized after scene {i+1}", extra={"task_id": task_id})
             
             # Concatenate video clips
             from moviepy import VideoFileClip, concatenate_videoclips
@@ -477,7 +542,8 @@ def process_scene_parallel(scene, scene_idx, use_global_narration, global_audio_
     
     return _process_scene()
 
-def process_scene_sequential(scene, scene_idx, use_global_narration, global_audio_prompt_url, task_id):
+def process_scene_sequential(scene, scene_idx, use_global_narration, global_audio_prompt_url, task_id, 
+                           scene_context: dict = None, video_context: dict = None):
     """Process a single scene sequentially."""
     from video_generator.performance_optimizer import monitor_performance
     
@@ -536,7 +602,8 @@ def process_scene_sequential(scene, scene_idx, use_global_narration, global_audi
                     logger.error(f"Failed to generate narration: {e}", exc_info=True, extra={"task_id": task_id})
                     raise
         
-        scene_file, files_to_clean = render_scene(SceneInput(**scene), use_global_narration=use_global_narration, task_id=task_id)
+        scene_file, files_to_clean = render_scene(SceneInput(**scene), use_global_narration=use_global_narration, 
+                                                 task_id=task_id, scene_context=scene_context, video_context=video_context)
         return scene_file, files_to_clean
     
     return _process_scene() 
