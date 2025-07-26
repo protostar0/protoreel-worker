@@ -35,7 +35,7 @@ class SceneInput(BaseModel):
     type: str
     image: Optional[str] = None
     promptImage: Optional[str] = None
-    image_provider: Optional[str] = "openai"  # "openai", "freepik", or "gemini"
+    image_provider: Optional[str] = Config.DEFAULT_IMAGE_PROVIDER  # "openai", "freepik", or "gemini"
     video: Optional[str] = None
     narration: Optional[str] = None
     narration_text: Optional[str] = None
