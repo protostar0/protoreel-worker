@@ -22,7 +22,8 @@ class PerformanceOptimizer:
     """Performance optimization manager for video generation."""
     
     def __init__(self, cache_dir: str = None, max_workers: int = 4):
-        self.cache_dir = cache_dir or os.path.join(os.getcwd(), "cache")
+        from video_generator.config import Config
+        self.cache_dir = cache_dir or os.path.join(Config.TEMP_DIR, "cache")
         self.max_workers = max_workers
         self.executor = ThreadPoolExecutor(max_workers=max_workers)
         self.cache_stats = {"hits": 0, "misses": 0}
