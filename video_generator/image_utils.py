@@ -11,6 +11,7 @@ from video_generator.generate_image import generate_image_from_prompt as _genera
 from video_generator.freepik_api import generate_image_from_prompt_freepik
 from video_generator.gemini_api import generate_image_from_prompt_gemini
 from video_generator.config import Config
+from video_generator.performance_optimizer import cache_result
 
 logger = logging.getLogger(__name__)
 TEMP_DIR = Config.TEMP_DIR
@@ -42,9 +43,17 @@ def download_asset(url_or_path: str) -> str:
         logger.error(f"Asset not found: {url_or_path}")
         raise RuntimeError(f"[400] Asset not found: {url_or_path}")
 
+def generate_cache_key(prompt: str, api_key: str, out_path: str, provider: str = "openai") -> str:
+    """Generate a cache key for image generation."""
+    import hashlib
+    key_data = f"{prompt}:{provider}:{api_key or 'none'}"
+    return hashlib.md5(key_data.encode()).hexdigest()
+
+@cache_result(generate_cache_key)
 def generate_image_from_prompt(prompt: str, api_key: str, out_path: str, provider: str = "openai") -> str:
     """
     Generate an image from a text prompt using the specified provider API and save to out_path.
+    Results are cached to avoid regenerating the same images.
     
     Args:
         prompt: Text prompt for image generation
@@ -55,13 +64,19 @@ def generate_image_from_prompt(prompt: str, api_key: str, out_path: str, provide
     Returns:
         Path to the generated image
     """
-    logger.info(f"Generating image with {provider} API. Prompt: {prompt[:50]}...")
+    from video_generator.performance_optimizer import monitor_performance
     
-    if provider.lower() == "freepik":
-        return generate_image_from_prompt_freepik(prompt, api_key, out_path)
-    elif provider.lower() == "openai":
-        return _generate_image_from_prompt(prompt, api_key, out_path)
-    elif provider.lower() == "gemini":
-        return generate_image_from_prompt_gemini(prompt, out_path)
-    else:
-        raise ValueError(f"Unsupported image generation provider: {provider}. Supported providers: openai, freepik, gemini") 
+    @monitor_performance("image_generation")
+    def _generate_image_internal():
+        logger.info(f"Generating image with {provider} API. Prompt: {prompt[:50]}...")
+        
+        if provider.lower() == "freepik":
+            return generate_image_from_prompt_freepik(prompt, api_key, out_path)
+        elif provider.lower() == "openai":
+            return _generate_image_from_prompt(prompt, api_key, out_path)
+        elif provider.lower() == "gemini":
+            return generate_image_from_prompt_gemini(prompt, out_path)
+        else:
+            raise ValueError(f"Unsupported image generation provider: {provider}. Supported providers: openai, freepik, gemini")
+    
+    return _generate_image_internal() 

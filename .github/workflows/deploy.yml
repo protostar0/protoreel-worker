@@ -37,10 +37,10 @@ jobs:
         && gcloud run jobs update "${{ secrets.CLOUD_RUN_JOB }}" \
             --image gcr.io/${{ secrets.GCP_PROJECT }}/${{ secrets.GCR_IMAGE_NAME }}:latest \
             --region ${{ secrets.GCP_REGION }} \
-            --memory=4Gi --cpu=2 \
-            --set-env-vars="DATABASE_URL=${{ secrets.DATABASE_URL }},R2_BUCKET_NAME=${{ secrets.R2_BUCKET_NAME }},OTHER_ENV=..." \
+            --memory=8Gi --cpu=4 \
+            --set-env-vars="${{ secrets.WORKER_ENV_VARS }}" \
         || gcloud run jobs create "${{ secrets.CLOUD_RUN_JOB }}" \
             --image gcr.io/${{ secrets.GCP_PROJECT }}/${{ secrets.GCR_IMAGE_NAME }}:latest \
             --region ${{ secrets.GCP_REGION }} \
-            --memory=16Gi --cpu=4 
-      # This step deploys or updates a Cloud Run Job, not a Service.
+            --memory=8Gi --cpu=4 \
+            --set-env-vars="${{ secrets.WORKER_ENV_VARS }}"      # This step deploys or updates a Cloud Run Job, not a Service.

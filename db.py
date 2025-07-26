@@ -134,14 +134,59 @@ if USE_SQL_DB:
             if error is not None:
                 task.error = error
             
-            # Set timestamps based on status
-            if status == 'inprogress' and task.started_at is None:
+            # Set timestamps based on status - always update when status changes
+            if status == 'inprogress':
+                old_started_at = task.started_at
                 task.started_at = datetime.utcnow()
-            elif status in ['finished', 'failed'] and task.finished_at is None:
+                print(f"[TASK] Task {task_id} started at: {task.started_at}")
+                if old_started_at:
+                    print(f"[TASK] Task {task_id} previous started_at was: {old_started_at}")
+            elif status in ['finished', 'failed']:
+                old_finished_at = task.finished_at
                 task.finished_at = datetime.utcnow()
+                duration = None
+                if task.started_at:
+                    duration = (task.finished_at - task.started_at).total_seconds()
+                    print(f"[TASK] Task {task_id} finished at: {task.finished_at}")
+                    print(f"[TASK] Task {task_id} duration: {duration:.2f} seconds")
+                else:
+                    print(f"[TASK] Task {task_id} finished at: {task.finished_at} (no start time recorded)")
+                if old_finished_at:
+                    print(f"[TASK] Task {task_id} previous finished_at was: {old_finished_at}")
             
             db.commit()
             return task
+        finally:
+            db.close()
+
+    @retry_on_transient
+    def get_task_duration(task_id: str) -> float:
+        """Get the duration of a task in seconds."""
+        db = SessionLocal()
+        try:
+            task = db.query(Task).filter(Task.id == task_id).first()
+            if not task or not task.started_at or not task.finished_at:
+                return None
+            return (task.finished_at - task.started_at).total_seconds()
+        finally:
+            db.close()
+
+    @retry_on_transient
+    def get_last_task_duration(user_api_key: str) -> float:
+        """Get the duration of the last completed task for a user."""
+        db = SessionLocal()
+        try:
+            # Get the most recent finished or failed task for this user
+            task = db.query(Task).filter(
+                Task.user_api_key == user_api_key,
+                Task.status.in_(['finished', 'failed']),
+                Task.started_at.isnot(None),
+                Task.finished_at.isnot(None)
+            ).order_by(Task.finished_at.desc()).first()
+            
+            if task:
+                return (task.finished_at - task.started_at).total_seconds()
+            return None
         finally:
             db.close()
 
@@ -217,13 +262,49 @@ else:
             if error is not None:
                 _tasks[task_id]["error"] = error
             
-            # Set timestamps based on status
-            if status == 'inprogress' and _tasks[task_id]["started_at"] is None:
+            # Set timestamps based on status - always update when status changes
+            if status == 'inprogress':
+                old_started_at = _tasks[task_id]["started_at"]
                 _tasks[task_id]["started_at"] = datetime.utcnow()
-            elif status in ['finished', 'failed'] and _tasks[task_id]["finished_at"] is None:
+                print(f"[TASK] Task {task_id} started at: {_tasks[task_id]['started_at']}")
+                if old_started_at:
+                    print(f"[TASK] Task {task_id} previous started_at was: {old_started_at}")
+            elif status in ['finished', 'failed']:
+                old_finished_at = _tasks[task_id]["finished_at"]
                 _tasks[task_id]["finished_at"] = datetime.utcnow()
+                duration = None
+                if _tasks[task_id]["started_at"]:
+                    duration = (_tasks[task_id]["finished_at"] - _tasks[task_id]["started_at"]).total_seconds()
+                    print(f"[TASK] Task {task_id} finished at: {_tasks[task_id]['finished_at']}")
+                    print(f"[TASK] Task {task_id} duration: {duration:.2f} seconds")
+                else:
+                    print(f"[TASK] Task {task_id} finished at: {_tasks[task_id]['finished_at']} (no start time recorded)")
+                if old_finished_at:
+                    print(f"[TASK] Task {task_id} previous finished_at was: {old_finished_at}")
             
             return _tasks[task_id]
+        return None
+
+    def get_task_duration(task_id: str) -> float:
+        """Get the duration of a task in seconds."""
+        if task_id in _tasks:
+            task = _tasks[task_id]
+            if task.get("started_at") and task.get("finished_at"):
+                return (task["finished_at"] - task["started_at"]).total_seconds()
+        return None
+
+    def get_last_task_duration(user_api_key: str) -> float:
+        """Get the duration of the last completed task for a user."""
+        # Find the most recent finished or failed task for this user
+        user_tasks = [task for task in _tasks.values() 
+                     if task["user_api_key"] == user_api_key 
+                     and task["status"] in ['finished', 'failed']
+                     and task.get("started_at") and task.get("finished_at")]
+        
+        if user_tasks:
+            # Sort by finished_at descending and get the most recent
+            latest_task = max(user_tasks, key=lambda x: x["finished_at"])
+            return (latest_task["finished_at"] - latest_task["started_at"]).total_seconds()
         return None
 
     def get_task_by_id(task_id: str):
