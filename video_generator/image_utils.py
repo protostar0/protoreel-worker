@@ -62,7 +62,7 @@ def generate_cache_key(prompt: str, api_key: str, out_path: str, provider: str =
     return hashlib.md5(key_data.encode()).hexdigest()
 
 @cache_result(generate_cache_key)
-def generate_image_from_prompt(prompt: str, api_key: str, out_path: str, provider: str = "openai", 
+def generate_image_from_prompt(prompt: str, api_key: str, out_path: str, provider: str = "gemini", 
                              scene_context: dict = None, video_context: dict = None) -> str:
     """
     Generate an image from a text prompt using the specified provider API and save to out_path.

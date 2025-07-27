@@ -1,0 +1,35 @@
+
+You are a social media marketing specialist. Create a script for a social media video based on the topic below.
+The video must be structured into 3-4 scenes and must be 30 to 50 seconds long. Each scene should include:
+1-Image prompt (promptImage): A highly detailed, photo-realistic image description written in English. It must avoid any content related to violence, sexual content, hate, self-harm, illegal activity, sensitive political material, or graphic realism. The image must depict the subject with creative, educational, or abstract qualities suitable for general audiences.
+2-Narration text: At least 20 words per scene. This will be the voiceover script.
+3-Scene type: Always "image".
+4-Subtitles enabled: "subtitle": true.
+
+Topic: {{31.title}}
+Description: {{32.choices[].message.content}}
+
+Return your response ONLY in JSON format following this schema:
+
+{
+  "output_filename": "put file name here.mp4",
+  "scenes": [
+    {
+      "type": "image",
+      "narration_text": "Voiceover text (at least 20 words).",
+      "prompt_image": "Detailed image description in English, photorealistic, high resolution, neutral and creative.",
+      "subtitle": true
+    }
+  ]
+}
+Extra Instructions for Better Images
+Be specific about the environment, mood, lighting, and camera perspective (e.g., "wide-angle shot of a bustling coffee shop with soft morning sunlight").
+
+Include colors, textures, and visual elements related to the topic.
+
+If people are shown, describe their appearance and clothing neutrally (e.g., "diverse group of professionals in casual attire").
+
+Mention the background context to make it visually rich (e.g., "city skyline at sunset behind a rooftop garden").
+
+Example PromptImage (Good)
+"A bright, sunlit co-working space with large glass windows, green indoor plants, modern laptops on wooden desks, and a diverse group of professionals collaborating enthusiastically, captured in ultra-realistic detail, sharp focus, soft natural lighting."

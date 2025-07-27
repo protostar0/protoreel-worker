@@ -37,7 +37,7 @@ def test_config():
         # Test creating a scene
         test_scene = {
             "type": "image",
-            "promptImage": "A test image",
+            "promp_image": "A test image",
             "duration": 5
         }
         
