@@ -237,72 +237,25 @@ def render_scene(scene: SceneInput, use_global_narration: bool = False, task_id:
         try:
             logger.info(f"Exporting scene to {scene_output}", extra={"task_id": task_id})
             
-            # Determine optimal codec based on hardware acceleration
-            codec = "libx264"  # Default safe codec
-            if Config.USE_HARDWARE_ACCELERATION and Config.AUTO_DETECT_HARDWARE:
-                # Try to detect hardware acceleration with better error handling
-                import subprocess
-                try:
-                    result = subprocess.run(['ffmpeg', '-encoders'], capture_output=True, text=True, timeout=10)
-                    if result.returncode == 0 and 'h264_nvenc' in result.stdout:
-                        codec = 'h264_nvenc'
-                        logger.info("Using NVIDIA hardware acceleration (h264_nvenc)", extra={"task_id": task_id})
-                    elif result.returncode == 0 and 'h264_qsv' in result.stdout:
-                        codec = 'h264_qsv'
-                        logger.info("Using Intel QuickSync hardware acceleration (h264_qsv)", extra={"task_id": task_id})
-                    else:
-                        codec = 'libx264'
-                        logger.info("Using software encoding (libx264) - hardware acceleration not available", extra={"task_id": task_id})
-                except (subprocess.TimeoutExpired, FileNotFoundError, Exception) as e:
-                    codec = 'libx264'
-                    logger.warning(f"Hardware acceleration detection failed, using software encoding: {e}", extra={"task_id": task_id})
-            elif Config.FFMPEG_HWACCEL != "auto":
-                codec = Config.FFMPEG_HWACCEL
-                logger.info(f"Using configured hardware acceleration: {codec}", extra={"task_id": task_id})
-            else:
-                logger.info("Using software encoding (libx264)", extra={"task_id": task_id})
+            # Use simple, reliable codec settings for scene rendering
+            codec = "libx264"  # Default reliable codec
             
             # Use optimal threads for encoding
             threads = min(Config.SCENE_RENDERING_THREADS, os.cpu_count() or 4)
             
-            # Add error handling for video export
-            try:
-                video_clip.write_videofile(
-                    scene_output,
-                    fps=24,
-                    codec=codec,
-                    audio_codec="aac",
-                    temp_audiofile=f"{scene_output}.temp_audio.m4a",
-                    remove_temp=True,
-                    logger=None,
-                    threads=threads,
-                    preset=Config.SCENE_RENDERING_PRESET,
-                    bitrate=Config.FFMPEG_BITRATE,
-                    ffmpeg_params=['-crf', str(Config.FFMPEG_CRF)] if Config.FFMPEG_CRF else None
-                )
-            except Exception as e:
-                # If hardware acceleration fails, fallback to software encoding
-                if codec != 'libx264':
-                    logger.warning(f"Hardware acceleration failed with {codec}, falling back to software encoding: {e}", extra={"task_id": task_id})
-                    try:
-                        video_clip.write_videofile(
-                            scene_output,
-                            fps=24,
-                            codec='libx264',
-                            audio_codec="aac",
-                            temp_audiofile=f"{scene_output}.temp_audio.m4a",
-                            remove_temp=True,
-                            logger=None,
-                            threads=threads,
-                            preset=Config.SCENE_RENDERING_PRESET,
-                            bitrate=Config.FFMPEG_BITRATE,
-                            ffmpeg_params=['-crf', str(Config.FFMPEG_CRF)] if Config.FFMPEG_CRF else None
-                        )
-                    except Exception as fallback_error:
-                        logger.error(f"Both hardware and software encoding failed: {fallback_error}", exc_info=True, extra={"task_id": task_id})
-                        raise
-                else:
-                    raise
+            video_clip.write_videofile(
+                scene_output,
+                fps=24,
+                codec=codec,
+                audio_codec="aac",
+                temp_audiofile=f"{scene_output}.temp_audio.m4a",
+                remove_temp=True,
+                logger=None,
+                threads=threads,
+                preset=Config.SCENE_RENDERING_PRESET,
+                bitrate=Config.FFMPEG_BITRATE,
+                ffmpeg_params=['-crf', str(Config.FFMPEG_CRF)] if Config.FFMPEG_CRF else None
+            )
             temp_files.append(scene_output)
             video_clip.close()
             del video_clip
@@ -464,23 +417,8 @@ def generate_video_core(request_dict, task_id=None):
                     final_clip = final_clip.subclip(0, max_duration)
                 
                 # Export final video
-                # Determine optimal codec based on hardware acceleration
-                codec = "libx264"  # Default
-                if Config.USE_HARDWARE_ACCELERATION and Config.AUTO_DETECT_HARDWARE:
-                    # Try to detect hardware acceleration
-                    import subprocess
-                    try:
-                        result = subprocess.run(['ffmpeg', '-encoders'], capture_output=True, text=True)
-                        if 'h264_nvenc' in result.stdout:
-                            codec = 'h264_nvenc'
-                        elif 'h264_qsv' in result.stdout:
-                            codec = 'h264_qsv'
-                        else:
-                            codec = 'libx264'
-                    except:
-                        codec = 'libx264'
-                elif Config.FFMPEG_HWACCEL != "auto":
-                    codec = Config.FFMPEG_HWACCEL
+                # Use simple, reliable codec settings
+                codec = "libx264"  # Default reliable codec
                 
                 # Use optimal threads for encoding
                 threads = min(Config.FINAL_VIDEO_THREADS, os.cpu_count() or 4)

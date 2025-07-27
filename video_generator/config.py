@@ -62,7 +62,7 @@ class Config:
     
     # Final video optimization (better quality for final output)
     FINAL_VIDEO_THREADS = int(os.environ.get("FINAL_VIDEO_THREADS", os.cpu_count() or 4))
-    FINAL_VIDEO_PRESET = os.environ.get("FINAL_VIDEO_PRESET", "fast")  # fast for good quality/speed balance 
+    FINAL_VIDEO_PRESET = os.environ.get("FINAL_VIDEO_PRESET", "fast")  # fast for good quality/speed balance
     
     # Performance optimization settings
     ENABLE_AGGRESSIVE_OPTIMIZATION = os.environ.get("ENABLE_AGGRESSIVE_OPTIMIZATION", "true").lower() == "true"
