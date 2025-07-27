@@ -23,7 +23,6 @@ import time
 
 logger = get_logger()
 
-TEMP_DIR = Config.TEMP_DIR
 REEL_SIZE = Config.REEL_SIZE
 
 class TextOverlay(BaseModel):
@@ -233,7 +232,7 @@ def render_scene(scene: SceneInput, use_global_narration: bool = False, task_id:
             except Exception as e:
                 logger.error(f"Failed to mix audio tracks: {e}", exc_info=True, extra={"task_id": task_id})
                 raise
-        scene_output = os.path.join(TEMP_DIR, f"scene_{uuid.uuid4().hex}.mp4")
+        scene_output = os.path.join(Config.TEMP_DIR, f"scene_{uuid.uuid4().hex}.mp4")
         try:
             logger.info(f"Exporting scene to {scene_output}", extra={"task_id": task_id})
             
@@ -423,19 +422,40 @@ def generate_video_core(request_dict, task_id=None):
                 # Use optimal threads for encoding
                 threads = min(Config.FINAL_VIDEO_THREADS, os.cpu_count() or 4)
                 
-                final_clip.write_videofile(
-                    output_path,
-                    fps=Config.FPS,
-                    codec=codec,
-                    audio_codec='aac',
-                    temp_audiofile='temp-audio.m4a',
-                    remove_temp=True,
-                    logger=None,
-                    threads=threads,
-                    preset=Config.FINAL_VIDEO_PRESET,
-                    bitrate=Config.FFMPEG_BITRATE,
-                    ffmpeg_params=['-crf', str(Config.FFMPEG_CRF)] if Config.FFMPEG_CRF else None
-                )
+                # Validate final clip before export
+                if not final_clip or final_clip.duration <= 0:
+                    raise ValueError(f"Invalid final clip: duration={getattr(final_clip, 'duration', 0)}")
+                
+                logger.info(f"Exporting final video: duration={final_clip.duration:.2f}s, fps={Config.FPS}", extra={"task_id": task_id})
+                
+                # Add error handling for final video export
+                try:
+                    # Use a writable temp directory for audio file
+                    temp_audio_path = os.path.join(Config.TEMP_DIR, f"temp-audio-{task_id or 'final'}.m4a")
+                    
+                    final_clip.write_videofile(
+                        output_path,
+                        fps=Config.FPS,
+                        codec=codec,
+                        audio_codec='aac',
+                        temp_audiofile=temp_audio_path,
+                        remove_temp=True,
+                        logger=None,
+                        threads=threads,
+                        preset=Config.FINAL_VIDEO_PRESET,
+                        bitrate=Config.FFMPEG_BITRATE,
+                        ffmpeg_params=['-crf', str(Config.FFMPEG_CRF)] if Config.FFMPEG_CRF else None
+                    )
+                    logger.info(f"Final video exported successfully: {output_path}", extra={"task_id": task_id})
+                except Exception as export_error:
+                    logger.error(f"Failed to export final video: {export_error}", exc_info=True, extra={"task_id": task_id})
+                    # Try to get more info about the clips
+                    for i, clip in enumerate(clips):
+                        try:
+                            logger.info(f"Clip {i}: duration={getattr(clip, 'duration', 'N/A')}, size={getattr(clip, 'size', 'N/A')}", extra={"task_id": task_id})
+                        except Exception as clip_info_error:
+                            logger.error(f"Failed to get clip {i} info: {clip_info_error}", extra={"task_id": task_id})
+                    raise
                 
                 # Clean up clips
                 for clip in clips:
