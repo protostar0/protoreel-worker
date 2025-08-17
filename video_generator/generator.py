@@ -34,7 +34,7 @@ class TextOverlay(BaseModel):
 class SceneInput(BaseModel):
     type: str
     image: Optional[str] = None
-    promp_image: Optional[str] = None
+    prompt_image: Optional[str] = None
     image_provider: Optional[str] = Config.DEFAULT_IMAGE_PROVIDER  # "openai", "freepik", or "gemini"
     video: Optional[str] = None
     narration: Optional[str] = None
@@ -80,7 +80,7 @@ def render_scene(scene: SceneInput, use_global_narration: bool = False, task_id:
             except Exception as e:
                 logger.error(f"Failed to download image asset: {e}", exc_info=True, extra={"task_id": task_id})
                 raise
-        elif scene.promp_image:
+        elif scene.prompt_image:
             # Determine which API to use based on provider
             provider = getattr(scene, 'image_provider', Config.DEFAULT_IMAGE_PROVIDER).lower()
             
@@ -102,16 +102,16 @@ def render_scene(scene: SceneInput, use_global_narration: bool = False, task_id:
             
             out_path = os.path.join(tempfile.gettempdir(), f"generated_{uuid.uuid4().hex}.png")
             try:
-                logger.info(f"Generating image from prompt using {provider}: {scene.promp_image}", extra={"task_id": task_id})
-                image_path = generate_image_from_prompt(scene.promp_image, api_key, out_path, provider=provider, scene_context=scene_context, video_context=video_context)
+                logger.info(f"Generating image from prompt using {provider}: {scene.prompt_image}", extra={"task_id": task_id})
+                image_path = generate_image_from_prompt(scene.prompt_image, api_key, out_path, provider=provider, scene_context=scene_context, video_context=video_context)
                 temp_files.append(image_path)
                 logger.info(f"Generated image from prompt: {image_path}", extra={"task_id": task_id})
             except Exception as e:
                 logger.error(f"Image generation failed: {e}", exc_info=True, extra={"task_id": task_id})
                 raise
         else:
-            logger.error("Image URL/path or promp_image required for image scene.", extra={"task_id": task_id})
-            raise ValueError("Image URL/path or promp_image required for image scene.")
+            logger.error("Image URL/path or prompt_image required for image scene.", extra={"task_id": task_id})
+            raise ValueError("Image URL/path or prompt_image required for image scene.")
         # --- Set duration from narration_text if present ---
         narration_path = None
         narration_audio = None

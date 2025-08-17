@@ -23,7 +23,7 @@ def test_signal_handling():
         "scenes": [
             {
                 "type": "image",
-                "promp_image": "A simple test image",
+                "prompt_image": "A simple test image",
                 "duration": 5
             }
         ]

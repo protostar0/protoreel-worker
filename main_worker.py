@@ -296,7 +296,8 @@ def process_all_pending_tasks():
             
             logger.info(f"[JOB MODE] Generating video for task {task_id}...")
             logger.info(f"[JOB MODE] Payload keys: {list(payload.keys()) if isinstance(payload, dict) else 'Not a dict'}")
-            
+            logger.info(f"[JOB MODE]  video payload {task_id}: {payload}")
+
             # Force garbage collection before starting
             gc.collect()
             

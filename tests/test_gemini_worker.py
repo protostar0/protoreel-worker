@@ -29,7 +29,7 @@ def test_gemini_default_provider():
     # Test creating a scene without explicit image_provider
     test_scene = {
         "type": "image",
-        "promp_image": "A test image",
+        "prompt_image": "A test image",
         "duration": 5
     }
     
