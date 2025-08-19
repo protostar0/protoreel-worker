@@ -1,4 +1,4 @@
-# ProtoVideo Worker
+# ProtoReel Worker
 
 ## Environment Variables Configuration
 
