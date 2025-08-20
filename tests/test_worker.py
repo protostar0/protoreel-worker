@@ -28,7 +28,7 @@ def test_worker_job_mode():
             {
                 "type": "image",
                 "narration_text": "In a monumental announcement, President Donald Trump has revealed a massive trade deal with Japan, calling it the 'largest deal in history with Japan.' This landmark agreement promises to reshape global economic partnerships.",
-                "image": "https://pub-b3d68bfabb5742dabcd0275d1b282f2a.r2.dev/presus.png",
+                "image_url": "https://pub-b3d68bfabb5742dabcd0275d1b282f2a.r2.dev/presus.png",
                 "image_provider": "gemini",
                 "audio_prompt_url": "https://pub-b3d68bfabb5742dabcd0275d1b282f2a.r2.dev/fce24158.wav",
                 "subtitle": True

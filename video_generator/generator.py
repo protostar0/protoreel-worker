@@ -133,7 +133,7 @@ def add_logo_to_clip(video_clip, logo_config: LogoConfig, task_id: Optional[str]
 
 class SceneInput(BaseModel):
     type: str
-    image: Optional[str] = None
+    image_url: Optional[str] = None
     prompt_image: Optional[str] = None
     image_provider: Optional[str] = Config.DEFAULT_IMAGE_PROVIDER  # "openai", "freepik", or "gemini"
     video: Optional[str] = None
@@ -172,10 +172,10 @@ def render_scene(scene: SceneInput, use_global_narration: bool = False, task_id:
     # Handle image or video
     if scene.type == "image":
         image_path = None
-        if scene.image:
+        if scene.image_url:
             try:
-                logger.info(f"Downloading image asset: {scene.image}", extra={"task_id": task_id})
-                image_path = download_asset(scene.image)
+                logger.info(f"Downloading image asset: {scene.image_url}", extra={"task_id": task_id})
+                image_path = download_asset(scene.image_url)
                 temp_files.append(image_path)
                 logger.info(f"Added image from file: {image_path}", extra={"task_id": task_id})
             except Exception as e:
