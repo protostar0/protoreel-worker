@@ -28,14 +28,23 @@ def test_worker_job_mode():
             {
                 "type": "image",
                 "narration_text": "In a monumental announcement, President Donald Trump has revealed a massive trade deal with Japan, calling it the 'largest deal in history with Japan.' This landmark agreement promises to reshape global economic partnerships.",
-                "prompt_image": "A photo-realistic image of President holding a press conference with the flags of the United States and Japan in the background, emphasizing a momentous announcement.",
+                "image": "https://pub-b3d68bfabb5742dabcd0275d1b282f2a.r2.dev/presus.png",
                 "image_provider": "gemini",
                 "audio_prompt_url": "https://pub-b3d68bfabb5742dabcd0275d1b282f2a.r2.dev/fce24158.wav",
                 "subtitle": True
             }
-        ]
+        ],
+        "logo": {
+            "url": "https://pub-b3d68bfabb5742dabcd0275d1b282f2a.r2.dev/logo_protoreel%20(2).png",
+            "position": "bottom-left",
+            "opacity": 0.1,
+            "show_in_all_scenes": True,
+            "cta_screen": True,
+            "margin": 40
+        }
     }
     create_task(task_id, user_api_key, payload)
+    print("PYTHONPATH=. python main_worker.py ", task_id)
 
     # 2. Run the worker as a subprocess (simulate Cloud Run Job)
     # result = subprocess.run(

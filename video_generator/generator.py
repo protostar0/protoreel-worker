@@ -31,6 +31,106 @@ class TextOverlay(BaseModel):
     fontsize: int = 36
     color: str = "white"
 
+class LogoConfig(BaseModel):
+    url: str
+    position: str = "bottom-right"  # top-left, top-right, bottom-left, bottom-right, center
+    opacity: float = 0.6
+    show_in_all_scenes: bool = True
+    cta_screen: bool = True  # Show on call-to-action screen
+    size: Optional[tuple] = None  # (width, height) in pixels, auto-scaled if None
+    margin: int = 20  # Margin from edges in pixels
+
+def add_logo_to_clip(video_clip, logo_config: LogoConfig, task_id: Optional[str] = None) -> Any:
+    """
+    Add a logo to a video clip with specified positioning and opacity.
+    
+    Args:
+        video_clip: MoviePy video clip to add logo to
+        logo_config: Logo configuration object
+        task_id: Task ID for logging
+        
+    Returns:
+        Video clip with logo overlay
+    """
+    try:
+        from PIL import Image
+        import requests
+        from io import BytesIO
+        
+        logger.info(f"Adding logo to video clip: {logo_config.url}", extra={"task_id": task_id})
+        
+        # Download logo image
+        response = requests.get(logo_config.url, timeout=30)
+        response.raise_for_status()
+        logo_img = Image.open(BytesIO(response.content))
+        
+        # Convert to RGBA if not already
+        if logo_img.mode != 'RGBA':
+            logo_img = logo_img.convert('RGBA')
+        
+        # Resize logo if size is specified, otherwise auto-scale
+        if logo_config.size:
+            logo_img = logo_img.resize(logo_config.size, Image.Resampling.LANCZOS)
+        else:
+            # Auto-scale logo to reasonable size (max 15% of video dimensions)
+            max_width = int(video_clip.w * 0.20)
+            max_height = int(video_clip.h * 0.20)
+            logger.info(f"Logo size: {max_width}x{max_height}", extra={"task_id": task_id})
+            logo_img.thumbnail((max_width, max_height), Image.Resampling.LANCZOS)
+        
+        # Apply opacity
+        if logo_config.opacity < 1.0:
+            alpha = logo_img.split()[3]
+            alpha = alpha.point(lambda x: int(x * logo_config.opacity))
+            logo_img.putalpha(alpha)
+        
+        # Save logo to temporary file
+        temp_logo_path = os.path.join(Config.TEMP_DIR, f"logo_{uuid.uuid4().hex}.png")
+        logo_img.save(temp_logo_path, "PNG")
+        
+        # Create MoviePy clip from logo
+        logo_clip = ImageClip(temp_logo_path)
+        
+        # Calculate position based on logo_config.position
+        video_w, video_h = video_clip.size
+        logo_w, logo_h = logo_clip.size
+        margin = logo_config.margin
+        
+        if logo_config.position == "top-left":
+            x, y = margin, margin
+        elif logo_config.position == "top-right":
+            x, y = video_w - logo_w - margin, margin
+        elif logo_config.position == "bottom-left":
+            x, y = margin, video_h - logo_h - margin
+        elif logo_config.position == "bottom-right":
+            x, y = video_w - logo_w - margin, video_h - logo_h - margin
+        elif logo_config.position == "center":
+            x, y = (video_w - logo_w) // 2, (video_h - logo_h) // 2
+        else:
+            # Default to bottom-right if invalid position
+            x, y = video_w - logo_w - margin, video_h - logo_h - margin
+            logger.warning(f"Invalid logo position '{logo_config.position}', defaulting to bottom-right", extra={"task_id": task_id})
+        
+        # Set position and duration
+        logo_clip = logo_clip.with_position((x, y)).with_duration(video_clip.duration)
+        
+        # Composite logo over video
+        result_clip = CompositeVideoClip([video_clip, logo_clip])
+        
+        # Clean up temporary logo file
+        try:
+            os.remove(temp_logo_path)
+        except Exception as e:
+            logger.warning(f"Failed to remove temporary logo file: {e}", extra={"task_id": task_id})
+        
+        logger.info(f"Logo added successfully to position {logo_config.position}", extra={"task_id": task_id})
+        return result_clip
+        
+    except Exception as e:
+        logger.error(f"Failed to add logo to video clip: {e}", exc_info=True, extra={"task_id": task_id})
+        # Return original clip if logo addition fails
+        return video_clip
+
 class SceneInput(BaseModel):
     type: str
     image: Optional[str] = None
@@ -44,6 +144,7 @@ class SceneInput(BaseModel):
     duration: int
     text: Optional[TextOverlay] = None
     subtitle: bool = False
+    logo: Optional[LogoConfig] = None  # Per-scene logo configuration
     """
     image_provider:
         - "openai": Use OpenAI DALL-E
@@ -212,6 +313,17 @@ def render_scene(scene: SceneInput, use_global_narration: bool = False, task_id:
                 logger.info("Subtitles added for scene narration.", extra={"task_id": task_id})
             except Exception as e:
                 logger.warning(f"Subtitle generation failed for scene: {e}", exc_info=True, extra={"task_id": task_id})
+        
+        # Add logo if configured for this scene
+        if scene.logo:
+            try:
+                logger.info(f"Adding logo to scene: {scene.logo.url}", extra={"task_id": task_id})
+                video_clip = add_logo_to_clip(video_clip, scene.logo, task_id)
+                logger.info("Logo added to scene successfully", extra={"task_id": task_id})
+            except Exception as e:
+                logger.warning(f"Failed to add logo to scene: {e}", exc_info=True, extra={"task_id": task_id})
+                # Continue without logo if it fails
+        
         # Handle music
         if scene.music:
             try:
@@ -324,6 +436,16 @@ def generate_video_core(request_dict, task_id=None):
                     logger.error(f"Failed to generate global narration: {e}", exc_info=True, extra={"task_id": task_id})
                     raise
             
+            # Handle global logo configuration
+            global_logo = None
+            if request.get("logo"):
+                try:
+                    global_logo = LogoConfig(**request["logo"])
+                    logger.info(f"Global logo configured: {global_logo.url} at position {global_logo.position}", extra={"task_id": task_id})
+                except Exception as e:
+                    logger.warning(f"Invalid global logo configuration: {e}", extra={"task_id": task_id})
+                    global_logo = None
+            
             # Process scenes in parallel if multiple scenes
             if len(request["scenes"]) > 1:
                 logger.info(f"Processing {len(request['scenes'])} scenes in parallel", extra={"task_id": task_id})
@@ -359,6 +481,11 @@ def generate_video_core(request_dict, task_id=None):
                             "theme": request.get("theme"),
                             "output_filename": request.get("output_filename")
                         }
+                        
+                        # Apply global logo if no per-scene logo is configured
+                        if global_logo and global_logo.show_in_all_scenes and not scene.get("logo"):
+                            scene["logo"] = global_logo.dict()
+                            logger.info(f"Applied global logo to scene {idx+1}", extra={"task_id": task_id})
                         
                         scene_file, files_to_clean = process_scene_sequential(
                             scene, idx, use_global_narration, global_audio_prompt_url, task_id,
@@ -414,6 +541,16 @@ def generate_video_core(request_dict, task_id=None):
                 elif final_clip.duration > max_duration:
                     logger.warning(f"Final video duration {final_clip.duration:.2f}s exceeds {max_duration}s. Trimming.", extra={"task_id": task_id})
                     final_clip = final_clip.subclip(0, max_duration)
+                
+                # Add final logo if global logo is configured and cta_screen is enabled
+                if global_logo and global_logo.cta_screen:
+                    try:
+                        logger.info(f"Adding final logo to concatenated video: {global_logo.url}", extra={"task_id": task_id})
+                        final_clip = add_logo_to_clip(final_clip, global_logo, task_id)
+                        logger.info("Final logo added to concatenated video successfully", extra={"task_id": task_id})
+                    except Exception as e:
+                        logger.warning(f"Failed to add final logo to concatenated video: {e}", exc_info=True, extra={"task_id": task_id})
+                        # Continue without logo if it fails
                 
                 # Export final video
                 # Use simple, reliable codec settings
