@@ -131,10 +131,87 @@ def add_logo_to_clip(video_clip, logo_config: LogoConfig, task_id: Optional[str]
         # Return original clip if logo addition fails
         return video_clip
 
+def edit_image_with_prompt(image_url: str, prompt: str, task_id: Optional[str] = None) -> str:
+    """
+    Edit an existing image using Gemini AI based on a text prompt.
+    
+    Args:
+        image_url: URL of the image to edit
+        prompt: Text prompt describing the desired modifications
+        task_id: Task ID for logging
+        
+    Returns:
+        Path to the edited image file
+    """
+    try:
+        from PIL import Image
+        import requests
+        from io import BytesIO
+        import google.genai as genai
+        from google.genai import types
+        
+        logger.info(f"Editing image with Gemini AI. Prompt: {prompt[:100]}...", extra={"task_id": task_id})
+        
+        # Check if Gemini API key is available
+        api_key = os.environ.get("GEMENI_API_KEY")
+        if not api_key:
+            raise RuntimeError("GEMENI_API_KEY environment variable not set")
+        
+        # Download the source image
+        logger.info(f"Downloading source image from: {image_url}", extra={"task_id": task_id})
+        response = requests.get(image_url, timeout=60)
+        response.raise_for_status()
+        source_image = Image.open(BytesIO(response.content))
+        
+        # Convert to RGB if necessary (Gemini expects RGB)
+        if source_image.mode != 'RGB':
+            source_image = source_image.convert('RGB')
+        
+        # Initialize Gemini client
+        client = genai.Client(api_key=api_key)
+        
+        # Prepare the prompt for image editing
+        edit_prompt = f"Edit this image according to the following instructions: {prompt}. Maintain the same aspect ratio and composition while applying the requested changes."
+        
+        # Generate edited image
+        logger.info("Sending image editing request to Gemini AI...", extra={"task_id": task_id})
+        response = client.models.generate_content(
+            model="gemini-2.0-flash-preview-image-generation",
+            contents=[edit_prompt, source_image],
+            config=types.GenerateContentConfig(
+                response_modalities=['TEXT', 'IMAGE']
+            )
+        )
+        
+        # Extract the edited image from response
+        edited_image = None
+        for part in response.candidates[0].content.parts:
+            if hasattr(part, 'inline_data') and part.inline_data is not None:
+                edited_image = Image.open(BytesIO(part.inline_data.data))
+                break
+        
+        if not edited_image:
+            raise RuntimeError("No edited image received from Gemini AI")
+        
+        # Resize to match REEL_SIZE for consistency
+        edited_image = edited_image.resize(REEL_SIZE, Image.Resampling.LANCZOS)
+        
+        # Save edited image to temporary file
+        temp_edited_path = os.path.join(Config.TEMP_DIR, f"edited_image_{uuid.uuid4().hex}.png")
+        edited_image.save(temp_edited_path, "PNG")
+        
+        logger.info(f"Image edited successfully and saved to: {temp_edited_path}", extra={"task_id": task_id})
+        return temp_edited_path
+        
+    except Exception as e:
+        logger.error(f"Failed to edit image with Gemini AI: {e}", exc_info=True, extra={"task_id": task_id})
+        raise RuntimeError(f"Image editing failed: {e}")
+
 class SceneInput(BaseModel):
     type: str
     image_url: Optional[str] = None
     prompt_image: Optional[str] = None
+    prompt_edit_image: Optional[str] = None  # AI prompt to edit existing image
     image_provider: Optional[str] = Config.DEFAULT_IMAGE_PROVIDER  # "openai", "freepik", or "gemini"
     video: Optional[str] = None
     narration: Optional[str] = None
@@ -150,6 +227,10 @@ class SceneInput(BaseModel):
         - "openai": Use OpenAI DALL-E
         - "freepik": Use Freepik AI Mystic
         - "gemini": Use Google Gemini
+    
+    prompt_edit_image:
+        - AI prompt to modify existing image from image_url
+        - Uses Gemini AI to edit the image based on the prompt
     """
 
 def render_scene(scene: SceneInput, use_global_narration: bool = False, task_id: Optional[str] = None, 
@@ -213,6 +294,19 @@ def render_scene(scene: SceneInput, use_global_narration: bool = False, task_id:
         else:
             logger.error("Image URL/path or prompt_image required for image scene.", extra={"task_id": task_id})
             raise ValueError("Image URL/path or prompt_image required for image scene.")
+        
+        # Handle image editing if prompt_edit_image is provided
+        if scene.prompt_edit_image and image_path:
+            try:
+                logger.info(f"Editing image with AI prompt: {scene.prompt_edit_image[:100]}...", extra={"task_id": task_id})
+                edited_image_path = edit_image_with_prompt(scene.image_url, scene.prompt_edit_image, task_id)
+                temp_files.append(edited_image_path)
+                image_path = edited_image_path  # Use the edited image for video creation
+                logger.info(f"Image edited successfully, using edited version: {image_path}", extra={"task_id": task_id})
+            except Exception as e:
+                logger.warning(f"Image editing failed, using original image: {e}", extra={"task_id": task_id})
+                # Continue with original image if editing fails
+        
         # --- Set duration from narration_text if present ---
         narration_path = None
         narration_audio = None

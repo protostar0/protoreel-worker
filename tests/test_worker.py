@@ -30,6 +30,7 @@ def test_worker_job_mode():
                 "narration_text": "In a monumental announcement, President Donald Trump has revealed a massive trade deal with Japan, calling it the 'largest deal in history with Japan.' This landmark agreement promises to reshape global economic partnerships.",
                 "image_url": "https://pub-b3d68bfabb5742dabcd0275d1b282f2a.r2.dev/presus.png",
                 "image_provider": "gemini",
+                "prompt_edit_image": "add a llama next to the president, and make wear a hat and a red suit",
                 "audio_prompt_url": "https://pub-b3d68bfabb5742dabcd0275d1b282f2a.r2.dev/fce24158.wav",
                 "subtitle": True
             }
