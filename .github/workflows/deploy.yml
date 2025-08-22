@@ -43,4 +43,5 @@ jobs:
             --image gcr.io/${{ secrets.GCP_PROJECT }}/${{ secrets.GCR_IMAGE_NAME }}:latest \
             --region ${{ secrets.GCP_REGION }} \
             --memory=16Gi --cpu=4 \
-            --set-env-vars="${{ secrets.WORKER_ENV_VARS }}"      # This step deploys or updates a Cloud Run Job, not a Service.
+            --set-env-vars="${{ secrets.WORKER_ENV_VARS }}" \
+            --add-cloudsql-instances "protovideo:asia-northeast3:protoreel-postgresdb"
