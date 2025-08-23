@@ -18,7 +18,7 @@ from video_generator.audio_utils import generate_narration, generate_whisper_phr
 from video_generator.cleanup_utils import cleanup_files, upload_to_r2
 from video_generator.logging_utils import get_logger
 from video_generator.config import Config
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, validator
 import time
 
 logger = get_logger()
@@ -38,7 +38,11 @@ class LogoConfig(BaseModel):
     show_in_all_scenes: bool = True
     cta_screen: bool = True  # Show on call-to-action screen
     size: Optional[tuple] = None  # (width, height) in pixels, auto-scaled if None
-    margin: Optional[int] = 20  # Margin from edges in pixels, defaults to 20 if None
+    margin: Optional[int] = None  # Margin from edges in pixels
+    
+    @validator('margin', pre=True, always=True)
+    def set_default_margin(cls, v):
+        return v if v is not None else 20
 
 def add_logo_to_clip(video_clip, logo_config: LogoConfig, task_id: Optional[str] = None) -> Any:
     """
