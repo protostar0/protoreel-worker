@@ -234,7 +234,7 @@ class SceneInput(BaseModel):
     """
 
 def render_scene(scene: SceneInput, use_global_narration: bool = False, task_id: Optional[str] = None, 
-                scene_context: dict = None, video_context: dict = None) -> (str, List[str]):
+                scene_context: dict = None, video_context: dict = None, audio_prompt_url: Optional[str] = None) -> (str, List[str]):
     """
     Render a single scene (image or video) with optional narration, music, and subtitles.
     Returns the path to the rendered scene video and a list of temp files to clean up.
@@ -245,6 +245,7 @@ def render_scene(scene: SceneInput, use_global_narration: bool = False, task_id:
         task_id: Task ID for logging
         scene_context: Additional context about the scene (scene_index, total_scenes, etc.)
         video_context: Context about the entire video (theme, narration_text, etc.)
+        audio_prompt_url: Audio prompt URL to use as fallback if scene doesn't have one
     """
     logger.info(f"Rendering scene: {scene}", extra={"task_id": task_id})
     temp_files = []
@@ -322,11 +323,11 @@ def render_scene(scene: SceneInput, use_global_narration: bool = False, task_id:
                     raise
             elif scene.narration_text:
                 try:
-                    # Support per-scene audio_prompt_url
-                    audio_prompt_url = getattr(scene, 'audio_prompt_url', None)
-                    logger.info(f"Generating narration from text. audio_prompt_url={audio_prompt_url}", extra={"task_id": task_id})
-                    narration_path = generate_narration(text=scene.narration_text, audio_prompt_url=audio_prompt_url)
-                    temp_files.append(narration_path)
+                    # Use scene audio_prompt_url if set, else use the passed audio_prompt_url as fallback
+                    scene_audio_prompt_url = getattr(scene, 'audio_prompt_url', None)
+                    final_audio_prompt_url = scene_audio_prompt_url or audio_prompt_url
+                    logger.info(f"Generating narration from text. scene_audio_prompt_url={scene_audio_prompt_url}, fallback_audio_prompt_url={audio_prompt_url}, final_audio_prompt_url={final_audio_prompt_url}", extra={"task_id": task_id})
+                    narration_path = generate_narration(text=scene.narration_text, audio_prompt_url=final_audio_prompt_url)
                     logger.info(f"Added narration from text: {narration_path}", extra={"task_id": task_id})
                     
                     # Verify the file exists before trying to load it
@@ -339,9 +340,10 @@ def render_scene(scene: SceneInput, use_global_narration: bool = False, task_id:
                     
                     for attempt in range(max_retries):
                         try:
+                            from moviepy.audio.io.AudioFileClip import AudioFileClip
                             narration_audio = AudioFileClip(narration_path)
                             silence = AudioClip(lambda t: 0, duration=0.5, fps=44100)
-                            scene.duration = narration_audio.duration + 0.5
+                            # Don't modify the scene dictionary here - duration will be handled in render_scene
                             narration_audio.close()
                             break
                         except FileNotFoundError as e:
@@ -750,10 +752,11 @@ def process_scene_sequential(scene, scene_idx, use_global_narration, global_audi
                     raise
             elif scene.get("narration_text"):
                 try:
-                    # Use scene audio_prompt_url if set, else use global
-                    audio_prompt_url = scene.get("audio_prompt_url", global_audio_prompt_url)
-                    logger.info(f"Generating narration from text. audio_prompt_url={audio_prompt_url}", extra={"task_id": task_id})
-                    narration_path = generate_narration(scene["narration_text"], audio_prompt_url=audio_prompt_url)
+                    # Use scene audio_prompt_url if set, else use the passed audio_prompt_url as fallback
+                    scene_audio_prompt_url = scene.get('audio_prompt_url')
+                    final_audio_prompt_url = scene_audio_prompt_url or global_audio_prompt_url
+                    logger.info(f"Generating narration from text. scene_audio_prompt_url={scene_audio_prompt_url}, fallback_audio_prompt_url={global_audio_prompt_url}, final_audio_prompt_url={final_audio_prompt_url}", extra={"task_id": task_id})
+                    narration_path = generate_narration(text=scene["narration_text"], audio_prompt_url=final_audio_prompt_url)
                     logger.info(f"Added narration from text: {narration_path}", extra={"task_id": task_id})
                     
                     # Verify the file exists before trying to load it
@@ -769,11 +772,7 @@ def process_scene_sequential(scene, scene_idx, use_global_narration, global_audi
                             from moviepy.audio.io.AudioFileClip import AudioFileClip
                             narration_audio = AudioFileClip(narration_path)
                             silence = AudioClip(lambda t: 0, duration=0.5, fps=44100)
-                            # Only update duration, do not replace scene dict
-                            if "type" not in scene:
-                                logger.error(f"Scene missing required 'type' field after narration generation: {scene}", extra={"task_id": task_id})
-                                raise ValueError("Scene missing required 'type' field after narration generation")
-                            scene["duration"] = int(round(narration_audio.duration + 0.5))
+                            # Don't modify the scene dictionary here - duration will be handled in render_scene
                             narration_audio.close()
                             break
                         except FileNotFoundError as e:
@@ -791,8 +790,15 @@ def process_scene_sequential(scene, scene_idx, use_global_narration, global_audi
                     logger.error(f"Failed to generate narration: {e}", exc_info=True, extra={"task_id": task_id})
                     raise
         
+        # Ensure scene has required fields before creating SceneInput
+        if "duration" not in scene or not scene["duration"]:
+            # Set default duration if missing
+            scene["duration"] = scene.get("duration", 10)  # Default to 10 seconds
+            logger.info(f"Set default duration for scene: {scene['duration']} seconds", extra={"task_id": task_id})
+        
         scene_file, files_to_clean = render_scene(SceneInput(**scene), use_global_narration=use_global_narration, 
-                                                 task_id=task_id, scene_context=scene_context, video_context=video_context)
+                                                 task_id=task_id, scene_context=scene_context, video_context=video_context,
+                                                 audio_prompt_url=global_audio_prompt_url)
         return scene_file, files_to_clean
     
     return _process_scene() 

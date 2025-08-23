@@ -23,27 +23,26 @@ def test_worker_job_mode():
     task_id = str(uuid.uuid4())
     user_api_key = "test_api_key"
     payload = {
-        "output_filename": "test_worker_video3.mp4",
-        "scenes": [
-            {
-                "type": "image",
-                "narration_text": "In a monumental announcement, President Donald Trump has revealed a massive trade deal with Japan, calling it the 'largest deal in history with Japan.' This landmark agreement promises to reshape global economic partnerships.",
-                "image_url": "https://pub-b3d68bfabb5742dabcd0275d1b282f2a.r2.dev/presus.png",
-                "image_provider": "gemini",
-                "prompt_edit_image": "add a llama next to the president, and make wear a hat and a red suit",
-                "audio_prompt_url": "https://pub-b3d68bfabb5742dabcd0275d1b282f2a.r2.dev/fce24158.wav",
-                "subtitle": True
-            }
-        ],
-        "logo": {
-            "url": "https://pub-b3d68bfabb5742dabcd0275d1b282f2a.r2.dev/logo_protoreel%20(2).png",
-            "position": "bottom-left",
-            "opacity": 0.1,
-            "show_in_all_scenes": True,
-            "cta_screen": True,
-            "margin": 40
-        }
-    }
+      "output_filename":"crypto_optimism.mp4",
+      "scenes":[
+         {
+            "type":"image",
+                #   "audio_prompt_url":"https://pub-b3d68bfabb5742dabcd0275d1b282f2a.r2.dev/4919c596-f243-4ef6-bd7a-56678d0444e5.mp3",
+
+            "narration_text":"As Federal Reserve Chair Jerome Powell speaks at the Jackson Hole Economic Symposium, the crypto market reacts with optimism.",
+            "prompt_image":"A futuristic digital cityscape with neon lights illuminating the skyline, showcasing Bitcoin and Ethereum logos floating in the sky, symbolizing the surge in prices.",
+                "subtitle":True
+         }
+      ],
+      "logo":{
+         "url":"https://pub-b3d68bfabb5742dabcd0275d1b282f2a.r2.dev/f83ba57b-4730-4e67-b549-eac4ac857cda.png",
+         "position":"bottom-right",
+         "opacity":0.6,
+            "show_in_all_scenes":True,
+         "cta_screen":True
+      },
+      "audio_prompt_url":"https://pub-b3d68bfabb5742dabcd0275d1b282f2a.r2.dev/4919c596-f243-4ef6-bd7a-56678d0444e5.mp3"
+   }
     create_task(task_id, user_api_key, payload)
     print("PYTHONPATH=. python main_worker.py ", task_id)
 
