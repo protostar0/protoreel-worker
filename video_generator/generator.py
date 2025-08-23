@@ -38,7 +38,7 @@ class LogoConfig(BaseModel):
     show_in_all_scenes: bool = True
     cta_screen: bool = True  # Show on call-to-action screen
     size: Optional[tuple] = None  # (width, height) in pixels, auto-scaled if None
-    margin: int = 20  # Margin from edges in pixels
+    margin: Optional[int] = 20  # Margin from edges in pixels, defaults to 20 if None
 
 def add_logo_to_clip(video_clip, logo_config: LogoConfig, task_id: Optional[str] = None) -> Any:
     """
@@ -94,7 +94,7 @@ def add_logo_to_clip(video_clip, logo_config: LogoConfig, task_id: Optional[str]
         # Calculate position based on logo_config.position
         video_w, video_h = video_clip.size
         logo_w, logo_h = logo_clip.size
-        margin = logo_config.margin
+        margin = logo_config.margin or 20  # Use default margin if None
         
         if logo_config.position == "top-left":
             x, y = margin, margin
