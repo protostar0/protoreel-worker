@@ -18,7 +18,7 @@ from video_generator.audio_utils import generate_narration, generate_whisper_phr
 from video_generator.cleanup_utils import cleanup_files, upload_to_r2
 from video_generator.logging_utils import get_logger
 from video_generator.config import Config
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 import time
 
 logger = get_logger()
@@ -40,7 +40,8 @@ class LogoConfig(BaseModel):
     size: Optional[tuple] = None  # (width, height) in pixels, auto-scaled if None
     margin: Optional[int] = None  # Margin from edges in pixels
     
-    @validator('margin', pre=True, always=True)
+    @field_validator('margin', mode='before')
+    @classmethod
     def set_default_margin(cls, v):
         return v if v is not None else 20
 
@@ -222,6 +223,7 @@ class SceneInput(BaseModel):
     narration_text: Optional[str] = None
     audio_prompt_url: Optional[str] = None
     music: Optional[str] = None
+    music_volume: Optional[float] = 0.25  # Volume for background music (0.0 to 1.0)
     duration: int
     text: Optional[TextOverlay] = None
     subtitle: bool = False
@@ -745,12 +747,26 @@ def process_scene_sequential(scene, scene_idx, use_global_narration, global_audi
     @monitor_performance(f"scene_{scene_idx}_sequential")
     def _process_scene():
         # Per-scene narration
+        narration_path = None
+        narration_duration = None
+        
         if not use_global_narration:
             if scene.get("narration"):
                 try:
                     logger.info(f"Downloading narration asset: {scene.narration}", extra={"task_id": task_id})
                     narration_path = download_asset(scene.narration)
                     logger.info(f"Added narration from file: {narration_path}", extra={"task_id": task_id})
+                    
+                    # Get narration duration for duration calculation
+                    try:
+                        from moviepy.audio.io.AudioFileClip import AudioFileClip
+                        narration_audio = AudioFileClip(narration_path)
+                        narration_duration = narration_audio.duration
+                        narration_audio.close()
+                        logger.info(f"Narration duration: {narration_duration} seconds", extra={"task_id": task_id})
+                    except Exception as e:
+                        logger.warning(f"Could not determine narration duration: {e}", extra={"task_id": task_id})
+                        
                 except Exception as e:
                     logger.error(f"Failed to download narration asset: {e}", exc_info=True, extra={"task_id": task_id})
                     raise
@@ -767,7 +783,17 @@ def process_scene_sequential(scene, scene_idx, use_global_narration, global_audi
                     if not os.path.exists(narration_path):
                         raise FileNotFoundError(f"Narration file was not created: {narration_path}")
                     
-                    # Retry logic for loading the audio file
+                    # Get narration duration for duration calculation
+                    try:
+                        from moviepy.audio.io.AudioFileClip import AudioFileClip
+                        narration_audio = AudioFileClip(narration_path)
+                        narration_duration = narration_audio.duration
+                        narration_audio.close()
+                        logger.info(f"Narration duration: {narration_duration} seconds", extra={"task_id": task_id})
+                    except Exception as e:
+                        logger.warning(f"Could not determine narration duration: {e}", extra={"task_id": task_id})
+                    
+                    # Retry logic for loading the audio file (keeping existing logic for compatibility)
                     max_retries = 3
                     retry_delay = 0.1  # 100ms
                     
@@ -795,10 +821,15 @@ def process_scene_sequential(scene, scene_idx, use_global_narration, global_audi
                     raise
         
         # Ensure scene has required fields before creating SceneInput
-        if "duration" not in scene or not scene["duration"]:
-            # Set default duration if missing
-            scene["duration"] = scene.get("duration", 10)  # Default to 10 seconds
-            logger.info(f"Set default duration for scene: {scene['duration']} seconds", extra={"task_id": task_id})
+        if "duration" not in scene or scene["duration"] is None:
+            # Use narration duration if available, otherwise fall back to default
+            if narration_duration is not None:
+                # Convert float duration to integer by rounding up to ensure video covers entire audio
+                scene["duration"] = int(narration_duration + 0.5)  # Round to nearest integer
+                logger.info(f"Set scene duration to narration duration: {narration_duration}s -> {scene['duration']}s (rounded)", extra={"task_id": task_id})
+            else:
+                scene["duration"] = 10  # Fallback to 10 seconds if no narration
+                logger.info(f"No narration duration available, set default duration: {scene['duration']} seconds", extra={"task_id": task_id})
         
         scene_file, files_to_clean = render_scene(SceneInput(**scene), use_global_narration=use_global_narration, 
                                                  task_id=task_id, scene_context=scene_context, video_context=video_context,

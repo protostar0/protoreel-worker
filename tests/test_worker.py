@@ -31,7 +31,7 @@ def test_worker_job_mode():
 
             "narration_text":"As Federal Reserve Chair Jerome Powell speaks at the Jackson Hole Economic Symposium, the crypto market reacts with optimism.",
             "prompt_image":"A futuristic digital cityscape with neon lights illuminating the skyline, showcasing Bitcoin and Ethereum logos floating in the sky, symbolizing the surge in prices.",
-                "subtitle":True
+                "fisubtitle":True
          }
       ],
       "logo":{
