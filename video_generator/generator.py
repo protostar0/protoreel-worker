@@ -218,7 +218,12 @@ class SceneInput(BaseModel):
     prompt_image: Optional[str] = None
     prompt_edit_image: Optional[str] = None  # AI prompt to edit existing image
     image_provider: Optional[str] = Config.DEFAULT_IMAGE_PROVIDER  # "openai", "freepik", or "gemini"
-    video: Optional[str] = None
+    video_url: Optional[str] = None  # URL to existing video file
+    prompt_video: Optional[str] = None  # AI prompt to generate video using LumaAI
+    video_resolution: Optional[str] = "720p"  # Video resolution (720p, 1080p, 1440p)
+    video_aspect_ratio: Optional[str] = "9:16"  # Video aspect ratio (9:16, 16:9, 1:1, 4:3, 3:4)
+    video_duration: Optional[str] = "5s"  # Video duration (5s, 10s, etc.)
+    video_model: Optional[str] = "ray-2"  # LumaAI model to use
     narration: Optional[str] = None
     narration_text: Optional[str] = None
     audio_prompt_url: Optional[str] = None
@@ -257,6 +262,62 @@ def render_scene(scene: SceneInput, use_global_narration: bool = False, task_id:
     temp_files = []
     video_clip = None
     audio_clips = []
+    
+    # Initialize narration variables for all scene types
+    narration_path = None
+    narration_audio = None
+    
+    # Handle narration for all scene types
+    if not use_global_narration:
+        if scene.narration:
+            try:
+                logger.info(f"Downloading narration asset: {scene.narration}", extra={"task_id": task_id})
+                narration_path = download_asset(scene.narration)
+                temp_files.append(narration_path)
+                logger.info(f"Added narration from file: {narration_path}", extra={"task_id": task_id})
+            except Exception as e:
+                logger.error(f"Failed to download narration asset: {e}", exc_info=True, extra={"task_id": task_id})
+                raise
+        elif scene.narration_text:
+            try:
+                # Use scene audio_prompt_url if set, else use the passed audio_prompt_url as fallback
+                scene_audio_prompt_url = getattr(scene, 'audio_prompt_url', None)
+                final_audio_prompt_url = scene_audio_prompt_url or audio_prompt_url
+                logger.info(f"Generating narration from text. scene_audio_prompt_url={scene_audio_prompt_url}, fallback_audio_prompt_url={audio_prompt_url}, final_audio_prompt_url={final_audio_prompt_url}", extra={"task_id": task_id})
+                narration_path = generate_narration(text=scene.narration_text, audio_prompt_url=final_audio_prompt_url)
+                logger.info(f"Added narration from text: {narration_path}", extra={"task_id": task_id})
+                
+                # Verify the file exists before trying to load it
+                if not os.path.exists(narration_path):
+                    raise FileNotFoundError(f"Narration file was not created: {narration_path}")
+                
+                # Retry logic for loading the audio file
+                max_retries = 3
+                retry_delay = 0.1  # 100ms
+                
+                for attempt in range(max_retries):
+                    try:
+                        from moviepy.audio.io.AudioFileClip import AudioFileClip
+                        narration_audio = AudioFileClip(narration_path)
+                        silence = AudioClip(lambda t: 0, duration=0.5, fps=44100)
+                        # Don't modify the scene dictionary here - duration will be handled in render_scene
+                        narration_audio.close()
+                        break
+                    except FileNotFoundError as e:
+                        if attempt < max_retries - 1:
+                            logger.warning(f"Attempt {attempt + 1}: Narration file not found, retrying in {retry_delay}s: {e}", extra={"task_id": task_id})
+                            time.sleep(retry_delay)
+                            retry_delay *= 2  # Exponential backoff
+                        else:
+                            logger.error(f"Failed to load narration audio after {max_retries} attempts: {e}", exc_info=True, extra={"task_id": task_id})
+                            raise
+                    except Exception as e:
+                        logger.error(f"Failed to load narration audio: {e}", exc_info=True, extra={"task_id": task_id})
+                        raise
+            except Exception as e:
+                logger.error(f"Failed to generate narration: {e}", exc_info=True, extra={"task_id": task_id})
+                raise
+    
     # Handle image or video
     if scene.type == "image":
         image_path = None
@@ -315,57 +376,6 @@ def render_scene(scene: SceneInput, use_global_narration: bool = False, task_id:
                 # Continue with original image if editing fails
         
         # --- Set duration from narration_text if present ---
-        narration_path = None
-        narration_audio = None
-        if not use_global_narration:
-            if scene.narration:
-                try:
-                    logger.info(f"Downloading narration asset: {scene.narration}", extra={"task_id": task_id})
-                    narration_path = download_asset(scene.narration)
-                    temp_files.append(narration_path)
-                    logger.info(f"Added narration from file: {narration_path}", extra={"task_id": task_id})
-                except Exception as e:
-                    logger.error(f"Failed to download narration asset: {e}", exc_info=True, extra={"task_id": task_id})
-                    raise
-            elif scene.narration_text:
-                try:
-                    # Use scene audio_prompt_url if set, else use the passed audio_prompt_url as fallback
-                    scene_audio_prompt_url = getattr(scene, 'audio_prompt_url', None)
-                    final_audio_prompt_url = scene_audio_prompt_url or audio_prompt_url
-                    logger.info(f"Generating narration from text. scene_audio_prompt_url={scene_audio_prompt_url}, fallback_audio_prompt_url={audio_prompt_url}, final_audio_prompt_url={final_audio_prompt_url}", extra={"task_id": task_id})
-                    narration_path = generate_narration(text=scene.narration_text, audio_prompt_url=final_audio_prompt_url)
-                    logger.info(f"Added narration from text: {narration_path}", extra={"task_id": task_id})
-                    
-                    # Verify the file exists before trying to load it
-                    if not os.path.exists(narration_path):
-                        raise FileNotFoundError(f"Narration file was not created: {narration_path}")
-                    
-                    # Retry logic for loading the audio file
-                    max_retries = 3
-                    retry_delay = 0.1  # 100ms
-                    
-                    for attempt in range(max_retries):
-                        try:
-                            from moviepy.audio.io.AudioFileClip import AudioFileClip
-                            narration_audio = AudioFileClip(narration_path)
-                            silence = AudioClip(lambda t: 0, duration=0.5, fps=44100)
-                            # Don't modify the scene dictionary here - duration will be handled in render_scene
-                            narration_audio.close()
-                            break
-                        except FileNotFoundError as e:
-                            if attempt < max_retries - 1:
-                                logger.warning(f"Attempt {attempt + 1}: Narration file not found, retrying in {retry_delay}s: {e}", extra={"task_id": task_id})
-                                time.sleep(retry_delay)
-                                retry_delay *= 2  # Exponential backoff
-                            else:
-                                logger.error(f"Failed to load narration audio after {max_retries} attempts: {e}", exc_info=True, extra={"task_id": task_id})
-                                raise
-                        except Exception as e:
-                            logger.error(f"Failed to load narration audio: {e}", exc_info=True, extra={"task_id": task_id})
-                            raise
-                except Exception as e:
-                    logger.error(f"Failed to generate narration: {e}", exc_info=True, extra={"task_id": task_id})
-                    raise
         duration = scene.duration
         try:
             logger.info(f"Creating ImageClip for {image_path}", extra={"task_id": task_id})
@@ -381,25 +391,125 @@ def render_scene(scene: SceneInput, use_global_narration: bool = False, task_id:
         except Exception as e:
             logger.error(f"Failed to create or process ImageClip: {e}", exc_info=True, extra={"task_id": task_id})
             raise
-        # Add narration audio
-        if not use_global_narration:
-            if narration_path:
-                try:
-                    logger.info(f"Adding narration audio to video clip.", extra={"task_id": task_id})
-                    narration_clip = AudioFileClip(narration_path)
-                    if narration_clip.duration < video_clip.duration:
-                        silence = AudioClip(lambda t: 0, duration=video_clip.duration - narration_clip.duration)
-                        narration_padded = CompositeAudioClip([
-                            narration_clip,
-                            silence.with_start(narration_clip.duration)
-                        ])
-                        narration_padded = narration_padded.with_duration(video_clip.duration)
-                    else:
-                        narration_padded = narration_clip.subclipped(0, video_clip.duration)
-                    video_clip = video_clip.with_audio(narration_padded)
-                except Exception as e:
-                    logger.error(f"Failed to add narration audio: {e}", exc_info=True, extra={"task_id": task_id})
-                    raise
+            
+    elif scene.type == "video":
+        # Handle video generation from prompt using LumaAI
+        if scene.prompt_video:
+            try:
+                from video_generator.generate_video import generate_video_from_prompt, validate_video_settings
+                
+                # Validate and normalize video settings
+                resolution = getattr(scene, 'video_resolution', '720p')
+                aspect_ratio = getattr(scene, 'video_aspect_ratio', '9:16')
+                video_duration = getattr(scene, 'video_duration', '5s')
+                model = getattr(scene, 'video_model', 'ray-2')
+                
+                resolution, aspect_ratio, video_duration = validate_video_settings(resolution, aspect_ratio, video_duration)
+                
+                logger.info(f"Generating video from prompt: {scene.prompt_video[:100]}...", extra={"task_id": task_id})
+                video_path = generate_video_from_prompt(
+                    prompt=scene.prompt_video,
+                    duration=video_duration,
+                    resolution=resolution,
+                    aspect_ratio=aspect_ratio,
+                    model=model,
+                    task_id=task_id
+                )
+                temp_files.append(video_path)
+                logger.info(f"Video generated successfully: {video_path}", extra={"task_id": task_id})
+                
+                # Create video clip from generated video
+                from moviepy import VideoFileClip
+                video_clip = VideoFileClip(video_path)
+                
+                # Set duration from the generated video
+                duration = video_clip.duration
+                logger.info(f"Video duration: {duration} seconds", extra={"task_id": task_id})
+                
+            except Exception as e:
+                logger.error(f"Video generation failed: {e}", exc_info=True, extra={"task_id": task_id})
+                raise
+        elif scene.video_url:
+            # Use existing video file
+            try:
+                logger.info(f"Downloading video asset: {scene.video_url}", extra={"task_id": task_id})
+                video_path = download_asset(scene.video_url)
+                temp_files.append(video_path)
+                logger.info(f"Added video from file: {video_path}", extra={"task_id": task_id})
+                
+                # Create video clip from downloaded video
+                from moviepy import VideoFileClip
+                video_clip = VideoFileClip(video_path)
+                duration = scene.duration or video_clip.duration
+                logger.info(f"Video duration: {duration} seconds", extra={"task_id": task_id})
+                
+            except Exception as e:
+                logger.error(f"Failed to download video asset: {e}", exc_info=True, extra={"task_id": task_id})
+                raise
+        else:
+            logger.error("Video prompt or video URL required for video scene.", extra={"task_id": task_id})
+            raise ValueError("Video prompt or video URL required for video scene.")
+            
+        # Resize video to match REEL_SIZE
+        try:
+            video_clip = video_clip.resized(height=REEL_SIZE[1])
+            if video_clip.w > REEL_SIZE[0]:
+                video_clip = video_clip.resized(width=REEL_SIZE[0])
+        except Exception as e:
+            logger.error(f"Failed to resize video clip: {e}", exc_info=True, extra={"task_id": task_id})
+            raise
+            
+    else:
+        logger.error(f"Unsupported scene type: {scene.type}", extra={"task_id": task_id})
+        raise ValueError(f"Unsupported scene type: {scene.type}")
+        
+    # Add narration audio
+    if not use_global_narration:
+        if narration_path:
+            try:
+                logger.info(f"Adding narration audio to video clip.", extra={"task_id": task_id})
+                narration_clip = AudioFileClip(narration_path)
+                
+                if narration_clip.duration < video_clip.duration:
+                    # Narration is shorter - pad with silence to match video duration
+                    silence = AudioClip(lambda t: 0, duration=video_clip.duration - narration_clip.duration)
+                    narration_padded = CompositeAudioClip([
+                        narration_clip,
+                        silence.with_start(narration_clip.duration)
+                    ])
+                    narration_padded = narration_padded.with_duration(video_clip.duration)
+                    logger.info(f"Narration padded with silence: {narration_clip.duration}s -> {video_clip.duration}s", extra={"task_id": task_id})
+                else:
+                    # Narration is longer - extend video duration to match narration
+                    extended_duration = narration_clip.duration
+                    logger.info(f"Narration longer than video: extending video from {video_clip.duration}s to {extended_duration}s", extra={"task_id": task_id})
+                    
+                    # Extend video by looping or freezing the last frame
+                    if scene.type == "image":
+                        # For images, just extend the duration
+                        video_clip = video_clip.with_duration(extended_duration)
+                    elif scene.type == "video":
+                        # For videos, loop the video to cover the narration duration
+                        if extended_duration > video_clip.duration * 2:
+                            # If narration is much longer, loop the video
+                            loops_needed = int(extended_duration / video_clip.duration) + 1
+                            video_clips = [video_clip] * loops_needed
+                            video_clip = concatenate_videoclips(video_clips)
+                            video_clip = video_clip.subclipped(0, extended_duration)
+                            logger.info(f"Video looped {loops_needed} times to cover narration duration", extra={"task_id": task_id})
+                        else:
+                            # If narration is only slightly longer, just extend the last frame
+                            video_clip = video_clip.with_duration(extended_duration)
+                    
+                    # Use the full narration duration
+                    narration_padded = narration_clip
+                
+                video_clip = video_clip.with_audio(narration_padded)
+                logger.info(f"Audio synchronized: video={video_clip.duration}s, narration={narration_padded.duration}s", extra={"task_id": task_id})
+                
+            except Exception as e:
+                logger.error(f"Failed to add narration audio: {e}", exc_info=True, extra={"task_id": task_id})
+                raise
         # Add per-scene subtitles if requested
         if (
             getattr(scene, 'subtitle', False)
@@ -419,11 +529,16 @@ def render_scene(scene: SceneInput, use_global_narration: bool = False, task_id:
         # Add logo if configured for this scene
         if scene.logo:
             try:
-                logger.info(f"Adding logo to scene: {scene.logo.url}", extra={"task_id": task_id})
+                scene_type = scene.type
+                logger.info(f"Adding logo to {scene_type} scene: {scene.logo.url}", extra={"task_id": task_id})
+                logger.info(f"Logo configuration: position={scene.logo.position}, opacity={scene.logo.opacity}, margin={scene.logo.margin}", extra={"task_id": task_id})
+                
+                # Apply logo to the video clip
                 video_clip = add_logo_to_clip(video_clip, scene.logo, task_id)
-                logger.info("Logo added to scene successfully", extra={"task_id": task_id})
+                
+                logger.info(f"Logo added to {scene_type} scene successfully", extra={"task_id": task_id})
             except Exception as e:
-                logger.warning(f"Failed to add logo to scene: {e}", exc_info=True, extra={"task_id": task_id})
+                logger.warning(f"Failed to add logo to {scene.type} scene: {e}", exc_info=True, extra={"task_id": task_id})
                 # Continue without logo if it fails
         
         # Handle music
@@ -478,8 +593,6 @@ def render_scene(scene: SceneInput, use_global_narration: bool = False, task_id:
         except Exception as e:
             logger.error(f"Failed to export scene video: {e}", exc_info=True, extra={"task_id": task_id})
             raise
-    # TODO: Handle video scenes if needed
-    raise NotImplementedError("Video scenes not implemented in refactor.")
 
 def generate_video_core(request_dict, task_id=None):
     import copy

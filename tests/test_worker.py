@@ -23,25 +23,32 @@ def test_worker_job_mode():
     task_id = str(uuid.uuid4())
     user_api_key = "test_api_key"
     payload = {
-      "output_filename":"crypto_optimism.mp4",
-      "scenes":[
-         {
-            "type":"image",
-                #   "audio_prompt_url":"https://pub-b3d68bfabb5742dabcd0275d1b282f2a.r2.dev/4919c596-f243-4ef6-bd7a-56678d0444e5.mp3",
-
-            "narration_text":"As Federal Reserve Chair Jerome Powell speaks at the Jackson Hole Economic Symposium, the crypto market reacts with optimism.",
-            "prompt_image":"A futuristic digital cityscape with neon lights illuminating the skyline, showcasing Bitcoin and Ethereum logos floating in the sky, symbolizing the surge in prices.",
-                "fisubtitle":True
-         }
-      ],
+      "output_filename":"ads protoreel.mp4",
+        "scenes": [
+    {
+      "type": "video",
+      "prompt_video": "Cinematic macro close-up of a glowing futuristic interface, AI generating a social media reel in real-time, ultradetailed, high resolution, holographic UI, professional lighting, 9:16 aspect ratio",
+      "narration_text": "What if your next viral video was just one prompt away?"
+      
+    },
+    {
+      "type": "video",
+      "prompt_video": "Modern startup workspace, diverse creators working on laptops and phones, UI of ProtoReel tool on screen, dynamic transitions, cinematic lighting, shallow depth of field",
+      "narration_text": "Meet ProtoReel — the easiest way to turn ideas, articles, or prompts into stunning reels and shorts."
+    },
+    {
+      "type": "video",
+      "prompt_video": "Mobile phone screen showing Make.com and n8n automation scenario running, connected to ProtoReel API, reels publishing to Instagram and YouTube automatically, stylized UI animation, tech aesthetic",
+      "narration_text": "Built for developers and creators. Connect it to Make, n8n, or your app — and let automation do the magic."
+    },
+  ],
       "logo":{
          "url":"https://pub-b3d68bfabb5742dabcd0275d1b282f2a.r2.dev/f83ba57b-4730-4e67-b549-eac4ac857cda.png",
          "position":"bottom-right",
-         "opacity":0.6,
+         "opacity":0.2,
             "show_in_all_scenes":True,
          "cta_screen":True
       },
-      "audio_prompt_url":"https://pub-b3d68bfabb5742dabcd0275d1b282f2a.r2.dev/4919c596-f243-4ef6-bd7a-56678d0444e5.mp3"
    }
     create_task(task_id, user_api_key, payload)
     print("PYTHONPATH=. python main_worker.py ", task_id)
