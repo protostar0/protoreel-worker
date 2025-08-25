@@ -23,24 +23,30 @@ def test_worker_job_mode():
     task_id = str(uuid.uuid4())
     user_api_key = "test_api_key"
     payload = {
-      "output_filename":"ads protoreel.mp4",
+      "output_filename":"crypto_optimism.mp4",
         "scenes": [
     {
       "type": "video",
-      "prompt_video": "Cinematic macro close-up of a glowing futuristic interface, AI generating a social media reel in real-time, ultradetailed, high resolution, holographic UI, professional lighting, 9:16 aspect ratio",
-      "narration_text": "What if your next viral video was just one prompt away?"
-      
+      "video_url":"https://storage.cdn-luma.com/dream_machine/06d5cd11-4f6c-46c0-87b2-8ca9ad0de90c/4a00db94-84ca-4b6c-bf1b-c1c7a6e3226b_resultaf9af1a7bc3134be.mp4",
+    #   "prompt_video": "A vibrant table full of colorful fruits and vegetables under natural sunlight, cinematic close-up of fresh produce, high resolution, 16:9 aspect ratio",
+      "narration_text": "Did you know your plate’s colors can reveal how healthy your meal is?",
+        "subtitle": True,
+
     },
-    {
-      "type": "video",
-      "prompt_video": "Modern startup workspace, diverse creators working on laptops and phones, UI of ProtoReel tool on screen, dynamic transitions, cinematic lighting, shallow depth of field",
-      "narration_text": "Meet ProtoReel — the easiest way to turn ideas, articles, or prompts into stunning reels and shorts."
-    },
-    {
-      "type": "video",
-      "prompt_video": "Mobile phone screen showing Make.com and n8n automation scenario running, connected to ProtoReel API, reels publishing to Instagram and YouTube automatically, stylized UI animation, tech aesthetic",
-      "narration_text": "Built for developers and creators. Connect it to Make, n8n, or your app — and let automation do the magic."
-    },
+    # {
+    #   "type": "video",
+    #   "video_url":"https://storage.cdn-luma.com/dream_machine/4c5819c5-9040-4dfa-b7d1-4f16ab0a9b3c/8411958c-ca15-4acd-81a9-aa3c4bb1463c_result970d62fd71ed3325.mp4",
+    # #   "prompt_video": "A person slicing fresh avocado on wholegrain toast in a bright modern kitchen, clean aesthetic, close-up food photography style, shallow depth of field",
+    #   "narration_text": "Green foods like avocados and spinach boost your heart health and energy.",
+    #     "subtitle": True,
+    # },
+    # {
+    #   "type": "video",
+    #   "video_url":"https://storage.cdn-luma.com/dream_machine/a1a4ea1d-fcf9-4865-948c-c4a23f05b976/1ba1d390-b0b3-4119-a316-336ddebe506c_result480d6c9187b63fa4.mp4",
+    # #   "prompt_video": "Smoothie bowl with strawberries, blueberries, seeds arranged in a beautiful pattern, top-down cinematic shot with natural lighting",
+    #   "narration_text": "Fuel your day with real food—because health starts with what you eat.",
+    #     "subtitle": True,
+    # }
   ],
       "logo":{
          "url":"https://pub-b3d68bfabb5742dabcd0275d1b282f2a.r2.dev/f83ba57b-4730-4e67-b549-eac4ac857cda.png",

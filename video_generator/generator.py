@@ -14,7 +14,8 @@ from moviepy import (
 from moviepy.video.fx import CrossFadeIn, CrossFadeOut, MultiplyColor
 from moviepy.audio.AudioClip import AudioClip, concatenate_audioclips
 from video_generator.image_utils import download_asset, generate_image_from_prompt
-from video_generator.audio_utils import generate_narration, generate_whisper_phrase_subtitles
+from video_generator.audio_utils import generate_narration
+from video_generator.captacity_integration import generate_captacity_subtitles_compatible
 from video_generator.cleanup_utils import cleanup_files, upload_to_r2
 from video_generator.logging_utils import get_logger
 from video_generator.config import Config
@@ -518,8 +519,8 @@ def render_scene(scene: SceneInput, use_global_narration: bool = False, task_id:
         ):
             try:
                 logger.info(f"Generating subtitles for scene narration.", extra={"task_id": task_id})
-                subtitle_clips = generate_whisper_phrase_subtitles(
-                    narration_path, video_clip, min_words=4, max_words=6, font_size=50
+                subtitle_clips = generate_captacity_subtitles_compatible(
+                    narration_path, video_clip, min_words=4, max_words=6, font_size=130,position="center"
                 )
                 video_clip = CompositeVideoClip([video_clip] + subtitle_clips)
                 logger.info("Subtitles added for scene narration.", extra={"task_id": task_id})
