@@ -6,7 +6,6 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Add non-root user
-RUN useradd -m appuser
 
 # Set working dir
 WORKDIR /app
@@ -19,7 +18,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Change user
-USER appuser
 
 # Run the worker
 ENTRYPOINT ["python", "main_worker.py"]
