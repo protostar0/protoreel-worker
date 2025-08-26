@@ -233,6 +233,7 @@ class SceneInput(BaseModel):
     duration: int
     text: Optional[TextOverlay] = None
     subtitle: bool = False
+    subtitle_config: Optional[Dict[str, Any]] = None  # Per-scene subtitle configuration
     logo: Optional[LogoConfig] = None  # Per-scene logo configuration
     """
     image_provider:
@@ -519,8 +520,34 @@ def render_scene(scene: SceneInput, use_global_narration: bool = False, task_id:
         ):
             try:
                 logger.info(f"Generating subtitles for scene narration.", extra={"task_id": task_id})
+                
+                # Get subtitle configuration from scene or use defaults
+                subtitle_config = getattr(scene, 'subtitle_config', {}) or {}
+                
+                # Extract subtitle parameters with defaults
+                font = subtitle_config.get('font', 'Bangers-Regular.ttf')
+                font_size = subtitle_config.get('font_size', 110)
+                font_color = subtitle_config.get('font_color', 'white')
+                stroke_color = subtitle_config.get('stroke_color', 'black')
+                stroke_width = subtitle_config.get('stroke_width', 4)
+                highlight_current_word = subtitle_config.get('highlight_current_word', True)
+                word_highlight_color = subtitle_config.get('word_highlight_color', 'yellow')
+                line_count = subtitle_config.get('line_count', 2)
+                position = subtitle_config.get('position', 'center')
+                
+                logger.info(f"Subtitle config: font={font}, size={font_size}, color={font_color}, position={position}, highlight={highlight_current_word}", extra={"task_id": task_id})
+                
                 subtitle_clips = generate_captacity_subtitles_compatible(
-                    narration_path, video_clip, min_words=4, max_words=6, font_size=130,position="center"
+                    narration_path, video_clip,
+                    font=font,
+                    font_size=font_size,
+                    font_color=font_color,
+                    stroke_color=stroke_color,
+                    stroke_width=stroke_width,
+                    highlight_current_word=highlight_current_word,
+                    word_highlight_color=word_highlight_color,
+                    line_count=line_count,
+                    position=position,
                 )
                 video_clip = CompositeVideoClip([video_clip] + subtitle_clips)
                 logger.info("Subtitles added for scene narration.", extra={"task_id": task_id})

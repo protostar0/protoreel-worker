@@ -15,15 +15,20 @@ logger = get_logger()
 
 def generate_captacity_subtitles(
     video_path: str, 
-    audio_path: str, 
+    audio_path: str,
     output_path: str,
-    font_size: int = 50,
+    font: str = "Bangers-Regular.ttf",
+    font_size: int = 100,
     font_color: str = "white",
     stroke_color: str = "black",
     stroke_width: int = 4,
     position: str = "bottom",
+    task_id: Optional[str] = None,
+    word_highlight_color: str = "red",
+    line_count: int = 2,
+    highlight_current_word: bool = True,
     padding: int = 50,
-    task_id: Optional[str] = None
+
 ) -> str:
     """
     Generate subtitles using Captacity for a video with audio.
@@ -69,13 +74,17 @@ def generate_captacity_subtitles(
         add_captions(
             video_file=video_path,
             output_file=output_path,
+            font=font,
+            word_highlight_color=word_highlight_color,
+            line_count=line_count,
             font_size=font_size,
             font_color=font_color,
             stroke_color=stroke_color,
             stroke_width=stroke_width,
             position=position,
-            padding=padding,
-            print_info=True
+            print_info=True,
+            highlight_current_word=highlight_current_word,
+            padding=padding
         )
         
         # Verify the output file was created
@@ -98,11 +107,15 @@ def generate_captacity_subtitles(
 def generate_captacity_subtitles_for_scene(
     video_clip,
     audio_path: str,
-    font_size: int = 50,
+    font: str = "Bangers-Regular.ttf",
+    font_size: int = 100,
     font_color: str = "white",
     stroke_color: str = "black",
     stroke_width: int = 4,
-    position: str = "center",
+    highlight_current_word: bool = True,
+    word_highlight_color: str = "red",
+    line_count: int = 2,
+    position: str = "bottom",
     padding: int = 50,
     task_id: Optional[str] = None
 ) -> str:
@@ -112,10 +125,14 @@ def generate_captacity_subtitles_for_scene(
     Args:
         video_clip: MoviePy video clip object
         audio_path: Path to the audio file for transcription
+        font: Font file name to use for subtitles
         font_size: Font size for subtitles
         font_color: Color of the subtitle text
         stroke_color: Color of the text stroke/outline
         stroke_width: Width of the text stroke
+        highlight_current_word: Whether to highlight the current word
+        word_highlight_color: Color for word highlighting
+        line_count: Maximum number of lines for subtitles
         position: Position of subtitles ("bottom", "center", "top")
         padding: Padding from the edge of the video
         task_id: Task ID for logging
@@ -150,10 +167,14 @@ def generate_captacity_subtitles_for_scene(
             video_path=temp_video_path,
             audio_path=audio_path,
             output_path=output_path,
+            font=font,
             font_size=font_size,
             font_color=font_color,
             stroke_color=stroke_color,
             stroke_width=stroke_width,
+            highlight_current_word=highlight_current_word,
+            word_highlight_color=word_highlight_color,
+            line_count=line_count,
             position=position,
             padding=padding,
             task_id=task_id
@@ -177,12 +198,14 @@ def generate_captacity_subtitles_for_scene(
 def create_captacity_subtitle_clips(
     video_clip,
     audio_path: str,
-    font_size: int = 50,
+    font: str = "Bangers-Regular.ttf",
+    font_size: int = 100,
     font_color: str = "white",
     stroke_color: str = "black",
     stroke_width: int = 4,
     position: str = "bottom",
-    padding: int = 50,
+    word_highlight_color: str = "red",
+    line_count: int = 2,
     task_id: Optional[str] = None
 ) -> List:
     """
@@ -211,13 +234,15 @@ def create_captacity_subtitle_clips(
         subtitle_video_path = generate_captacity_subtitles_for_scene(
             video_clip=video_clip,
             audio_path=audio_path,
+            font=font,
             font_size=font_size,
             font_color=font_color,
             stroke_color=stroke_color,
             stroke_width=stroke_width,
             position=position,
-            padding=padding,
-            task_id=task_id
+            task_id=task_id,
+            word_highlight_color=word_highlight_color,
+            line_count=line_count,
         )
         
         # Load the video with subtitles as a clip
@@ -256,10 +281,16 @@ def test_captacity_integration() -> bool:
 def generate_captacity_subtitles_compatible(
     audio_path: str, 
     video_clip, 
-    min_words: int = 4, 
-    max_words: int = 6, 
+    font: str = "Bangers-Regular.ttf",
     font_size: int = 130,
-    position: str = "center"
+    font_color: str = "white",
+    stroke_color: str = "black",
+    stroke_width: int = 4,
+    highlight_current_word: bool = True,
+    word_highlight_color: str = "red",
+    line_count: int = 2,
+    position: str = "center",
+    padding: int = 50
 ) -> List:
     """
     Compatible function that mimics the old generate_whisper_phrase_subtitles interface.
@@ -267,9 +298,16 @@ def generate_captacity_subtitles_compatible(
     Args:
         audio_path: Path to the audio file
         video_clip: MoviePy video clip object
-        min_words: Minimum words per line (ignored in Captacity)
-        max_words: Maximum words per line (ignored in Captacity)
+        font: Font file name to use for subtitles
         font_size: Font size for subtitles
+        font_color: Color of the subtitle text
+        stroke_color: Color of the text stroke/outline
+        stroke_width: Width of the text stroke
+        highlight_current_word: Whether to highlight the current word
+        word_highlight_color: Color for word highlighting
+        line_count: Maximum number of lines for subtitles
+        position: Position of subtitles ("bottom", "center", "top")
+        padding: Padding from the edge of the video
         
     Returns:
         List containing a single video clip with subtitles
@@ -279,9 +317,17 @@ def generate_captacity_subtitles_compatible(
         subtitle_video_path = generate_captacity_subtitles_for_scene(
             video_clip=video_clip,
             audio_path=audio_path,
+            font=font,
+            font_color=font_color,
             font_size=font_size,
-            task_id=None,
-            position=position
+            stroke_color=stroke_color,
+            stroke_width=stroke_width,
+            highlight_current_word=highlight_current_word,
+            word_highlight_color=word_highlight_color,
+            line_count=line_count,
+            position=position,
+            padding=padding,
+            task_id=None
         )
         
         # Load the result as a clip
