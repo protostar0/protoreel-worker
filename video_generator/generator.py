@@ -247,7 +247,8 @@ class SceneInput(BaseModel):
     """
 
 def render_scene(scene: SceneInput, use_global_narration: bool = False, task_id: Optional[str] = None, 
-                scene_context: dict = None, video_context: dict = None, audio_prompt_url: Optional[str] = None) -> (str, List[str]):
+                scene_context: dict = None, video_context: dict = None, audio_prompt_url: Optional[str] = None,
+                global_subtitle_config: dict = None) -> (str, List[str]):
     """
     Render a single scene (image or video) with optional narration, music, and subtitles.
     Returns the path to the rendered scene video and a list of temp files to clean up.
@@ -259,6 +260,7 @@ def render_scene(scene: SceneInput, use_global_narration: bool = False, task_id:
         scene_context: Additional context about the scene (scene_index, total_scenes, etc.)
         video_context: Context about the entire video (theme, narration_text, etc.)
         audio_prompt_url: Audio prompt URL to use as fallback if scene doesn't have one
+        global_subtitle_config: Global subtitle configuration to use as fallback
     """
     logger.info(f"Rendering scene: {scene}", extra={"task_id": task_id})
     temp_files = []
@@ -521,8 +523,13 @@ def render_scene(scene: SceneInput, use_global_narration: bool = False, task_id:
             try:
                 logger.info(f"Generating subtitles for scene narration.", extra={"task_id": task_id})
                 
-                # Get subtitle configuration from scene or use defaults
+                # Get subtitle configuration from scene or use global config as fallback
                 subtitle_config = getattr(scene, 'subtitle_config', {}) or {}
+                
+                # If scene doesn't have subtitle config, use global config
+                if not subtitle_config and global_subtitle_config:
+                    subtitle_config = global_subtitle_config
+                    logger.info(f"Using global subtitle config for scene", extra={"task_id": task_id})
                 
                 # Extract subtitle parameters with defaults
                 font = subtitle_config.get('font', 'Bangers-Regular.ttf')
@@ -689,23 +696,55 @@ def generate_video_core(request_dict, task_id=None):
                     logger.warning(f"Invalid global logo configuration: {e}", extra={"task_id": task_id})
                     global_logo = None
             
+            # Handle global subtitle configuration
+            global_subtitle_config = request.get("global_subtitle_config", {})
+            if global_subtitle_config:
+                logger.info(f"Global subtitle config: {global_subtitle_config}", extra={"task_id": task_id})
+            else:
+                logger.info("No global subtitle config found", extra={"task_id": task_id})
+            
             # Process scenes in parallel if multiple scenes
             if len(request["scenes"]) > 1:
                 logger.info(f"Processing {len(request['scenes'])} scenes in parallel", extra={"task_id": task_id})
+                
+                # Debug: Log each scene before processing
+                for idx, scene in enumerate(request["scenes"]):
+                    logger.info(f"Scene {idx+1}: type={scene.get('type')}, narration_text={scene.get('narration_text', 'None')[:50]}...", extra={"task_id": task_id})
+                
+                logger.info(f"Starting parallel processing of {len(request['scenes'])} scenes - order will be preserved", extra={"task_id": task_id})
+                
                 scene_results = optimizer.parallel_process_scenes(
                     request["scenes"], 
                     process_scene_parallel, 
                     use_global_narration=use_global_narration,
                     global_audio_prompt_url=global_audio_prompt_url,
+                    global_subtitle_config=global_subtitle_config,
                     task_id=task_id
                 )
                 
-                # Extract results
-                for scene_file, files_to_clean in scene_results:
+                # Debug: Log results
+                logger.info(f"Scene processing results: {len(scene_results)} successful scenes", extra={"task_id": task_id})
+                
+                # IMPORTANT: Parallel processing doesn't preserve order, so we need to sort by scene index
+                # scene_results contains (scene_file, files_to_clean) tuples
+                # We need to extract the scene index from the process_scene_parallel function
+                
+                # Sort results by scene index to maintain original order
+                scene_results.sort(key=lambda x: x[2])  # Sort by scene index (3rd element)
+                
+                # Extract results in correct order
+                for scene_file, files_to_clean, scene_index in scene_results:
                     scene_files.append(scene_file)
                     temp_files.extend(files_to_clean)
+                    logger.info(f"Added scene {scene_index + 1} to final video", extra={"task_id": task_id})
             else:
                 # Process single scene sequentially
+                logger.info(f"Processing {len(request['scenes'])} scenes sequentially", extra={"task_id": task_id})
+                
+                # Debug: Log each scene before processing
+                for idx, scene in enumerate(request["scenes"]):
+                    logger.info(f"Scene {idx+1}: type={scene.get('type')}, narration_text={scene.get('narration_text', 'None')[:50]}...", extra={"task_id": task_id})
+                
                 for idx, scene in enumerate(request["scenes"]):
                     try:
                         logger.info(f"Processing scene {idx+1}/{len(request['scenes'])}", extra={"task_id": task_id})
@@ -732,7 +771,8 @@ def generate_video_core(request_dict, task_id=None):
                         
                         scene_file, files_to_clean = process_scene_sequential(
                             scene, idx, use_global_narration, global_audio_prompt_url, task_id,
-                            scene_context=scene_context, video_context=video_context
+                            scene_context=scene_context, video_context=video_context,
+                            global_subtitle_config=global_subtitle_config
                         )
                         scene_files.append(scene_file)
                         temp_files.extend(files_to_clean)
@@ -870,18 +910,21 @@ def generate_video_core(request_dict, task_id=None):
     
     return _generate_video_internal()
 
-def process_scene_parallel(scene, scene_idx, use_global_narration, global_audio_prompt_url, task_id):
+def process_scene_parallel(scene, scene_idx, use_global_narration, global_audio_prompt_url, global_subtitle_config, task_id):
     """Process a single scene for parallel execution."""
     from video_generator.performance_optimizer import monitor_performance
     
     @monitor_performance(f"scene_{scene_idx}_parallel")
     def _process_scene():
-        return process_scene_sequential(scene, scene_idx, use_global_narration, global_audio_prompt_url, task_id)
+        result = process_scene_sequential(scene, scene_idx, use_global_narration, global_audio_prompt_url, task_id, 
+                                     scene_context=None, video_context=None, global_subtitle_config=global_subtitle_config)
+        # Return scene index along with result for proper ordering
+        return result[0], result[1], scene_idx  # (scene_file, files_to_clean, scene_index)
     
     return _process_scene()
 
 def process_scene_sequential(scene, scene_idx, use_global_narration, global_audio_prompt_url, task_id, 
-                           scene_context: dict = None, video_context: dict = None):
+                           scene_context: dict = None, video_context: dict = None, global_subtitle_config: dict = None):
     """Process a single scene sequentially."""
     from video_generator.performance_optimizer import monitor_performance
     
@@ -974,7 +1017,7 @@ def process_scene_sequential(scene, scene_idx, use_global_narration, global_audi
         
         scene_file, files_to_clean = render_scene(SceneInput(**scene), use_global_narration=use_global_narration, 
                                                  task_id=task_id, scene_context=scene_context, video_context=video_context,
-                                                 audio_prompt_url=global_audio_prompt_url)
+                                                 audio_prompt_url=global_audio_prompt_url, global_subtitle_config=global_subtitle_config)
         return scene_file, files_to_clean
     
     return _process_scene() 

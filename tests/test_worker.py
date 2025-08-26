@@ -23,35 +23,54 @@ def test_worker_job_mode():
     task_id = str(uuid.uuid4())
     user_api_key = "test_api_key"
     payload = {
-      "output_filename":"crypto_optimism.mp4",
-        "scenes": [
+  "output_filename": "video_with_global_subtitle_fallback.mp4",
+  "global_subtitle_config": {
+    "font": "Bangers-Regular.ttf",
+    "font_size": 120,
+    "font_color": "yellow",
+    "stroke_color": "black",
+    "stroke_width": 3,
+    "highlight_current_word": True,
+    "word_highlight_color": "red",
+    "line_count": 2,
+    "position": "center",
+    "padding": 50
+  },
+  "scenes": [
     {
-      "type": "video",
-      "video_url":"https://storage.cdn-luma.com/dream_machine/06d5cd11-4f6c-46c0-87b2-8ca9ad0de90c/4a00db94-84ca-4b6c-bf1b-c1c7a6e3226b_resultaf9af1a7bc3134be.mp4",
-    #   "prompt_video": "A vibrant table full of colorful fruits and vegetables under natural sunlight, cinematic close-up of fresh produce, high resolution, 16:9 aspect ratio",
-      "narration_text": "Did you know your plate’s colors can reveal how healthy your meal is?",
-        "subtitle": True,
-
+      "type": "image",
+      "narration_text": "Welcome to our amazing video tutorial!",
+      "prompt_image": "A professional tutorial setup with modern equipment",
+    "subtitle": True,
+      "subtitle_config": {
+        "font_size": 150, 
+        "position": "bottom", 
+        "font_color": "white" 
+      }
     },
-    # {
-    #   "type": "video",
-    #   "video_url":"https://storage.cdn-luma.com/dream_machine/4c5819c5-9040-4dfa-b7d1-4f16ab0a9b3c/8411958c-ca15-4acd-81a9-aa3c4bb1463c_result970d62fd71ed3325.mp4",
-    # #   "prompt_video": "A person slicing fresh avocado on wholegrain toast in a bright modern kitchen, clean aesthetic, close-up food photography style, shallow depth of field",
-    #   "narration_text": "Green foods like avocados and spinach boost your heart health and energy.",
-    #     "subtitle": True,
-    # },
-    # {
-    #   "type": "video",
-    #   "video_url":"https://storage.cdn-luma.com/dream_machine/a1a4ea1d-fcf9-4865-948c-c4a23f05b976/1ba1d390-b0b3-4119-a316-336ddebe506c_result480d6c9187b63fa4.mp4",
-    # #   "prompt_video": "Smoothie bowl with strawberries, blueberries, seeds arranged in a beautiful pattern, top-down cinematic shot with natural lighting",
-    #   "narration_text": "Fuel your day with real food—because health starts with what you eat.",
-    #     "subtitle": True,
-    # }
+    {
+      "type": "image",
+      "narration_text": "Let's learn about advanced features",
+      "prompt_image": "Advanced technology concepts",
+      "subtitle": True,
+      "subtitle_config": {
+        "font_size": 150, 
+        "position": "bottom", 
+        "font_color": "white" 
+      }
+    },
+    {
+      "type": "image",
+      "narration_text": "This scene has no subtitle config",
+      "prompt_image": "Simple concept visualization",
+            "subtitle": True
+    }
   ],
       "logo":{
          "url":"https://pub-b3d68bfabb5742dabcd0275d1b282f2a.r2.dev/f83ba57b-4730-4e67-b549-eac4ac857cda.png",
          "position":"bottom-right",
-         "opacity":0.2,
+         "opacity":0.5,
+         "size":(200,200),
             "show_in_all_scenes":True,
          "cta_screen":True
       },
