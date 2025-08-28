@@ -125,7 +125,12 @@ def detect_local_whisper(print_info):
             print("Using OpenAI Whisper API...")
 
     return use_local_whisper
-
+def _run_ffmpeg(args):
+    # Simple wrapper that raises on error and captures stderr for debugging
+    res = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if res.returncode != 0:
+        raise RuntimeError(f"ffmpeg failed ({res.returncode}): {res.stderr.decode('utf-8', 'ignore')}")
+    return res
 def add_captions(
     video_file,
     output_file = "with_transcript.mp4",
@@ -163,118 +168,130 @@ def add_captions(
     if print_info:
         print("Extracting audio...")
 
-    temp_audio_file = tempfile.NamedTemporaryFile(suffix=".wav").name
-    ffmpeg([
-        'ffmpeg',
-        '-y',
-        '-i', video_file,
-        temp_audio_file
-    ])
+    if not os.path.exists(video_file):
+        raise FileNotFoundError(f"Video file not found: {video_file}")
 
-    if segments is None:
-        if print_info:
-            print("Transcribing audio...")
+    # Keep the temp audio alive while ffmpeg/transcription run
+    with tempfile.TemporaryDirectory(prefix="captacity-") as tmpdir:
+        temp_audio_file = os.path.join(tmpdir, "audio.wav")
 
-        if use_local_whisper == "auto":
-            use_local_whisper = detect_local_whisper(print_info)
+        # Extract mono 16 kHz WAV (good for Whisper and many ASR models)
+        _run_ffmpeg([
+            "ffmpeg",
+            "-y",
+            "-v", "error",
+            "-i", os.path.abspath(video_file),
+            "-vn",
+            "-ac", "1",
+            "-ar", "16000",
+            "-f", "wav",
+            os.path.abspath(temp_audio_file),
+        ])
 
-        if use_local_whisper:
-            segments = transcriber.transcribe_locally(temp_audio_file, initial_prompt)
-        else:
-            segments = transcriber.transcribe_with_api(temp_audio_file, initial_prompt)
+        if segments is None:
+            if print_info:
+                print("Transcribing audio...")
 
-    if print_info:
-        print("Generating video elements...")
+            if use_local_whisper == "auto":
+                use_local_whisper = detect_local_whisper(print_info)
 
-    # Open the video file
-    video = VideoFileClip(video_file)
-    text_bbox_width = video.w-padding*2
-    clips = [video]
-
-    captions = segment_parser.parse(
-        segments=segments,
-        fit_function=fit_function if fit_function else fits_frame(
-            line_count,
-            font,
-            font_size,
-            stroke_width,
-            text_bbox_width,
-        ),
-    )
-
-    for caption in captions:
-        captions_to_draw = []
-        if highlight_current_word:
-            for i, word in enumerate(caption["words"]):
-                if i+1 < len(caption["words"]):
-                    end = caption["words"][i+1]["start"]
-                else:
-                    end = word["end"]
-
-                captions_to_draw.append({
-                    "text": caption["text"],
-                    "start": word["start"],
-                    "end": end,
-                })
-        else:
-            captions_to_draw.append(caption)
-
-        for current_index, caption in enumerate(captions_to_draw):
-            line_data = calculate_lines(caption["text"], font, font_size, stroke_width, text_bbox_width)
-
-            # Calculate text_y_offset based on position
-            if position == "bottom":
-                text_y_offset = video.h - line_data["height"] - padding
+            if use_local_whisper:
+                segments = transcriber.transcribe_locally(temp_audio_file, initial_prompt)
             else:
-                text_y_offset = video.h // 2 - line_data["height"] // 2
+                segments = transcriber.transcribe_with_api(temp_audio_file, initial_prompt)
 
-            index = 0
-            for line in line_data["lines"]:
-                pos = ("center", text_y_offset)
+        if print_info:
+            print("Generating video elements...")
 
-                words = line["text"].split()
-                word_list = []
-                for w in words:
-                    word_obj = Word(w)
-                    if highlight_current_word and index == current_index:
-                        word_obj.set_color(word_highlight_color)
-                    index += 1
-                    word_list.append(word_obj)
+        # Open the video file
+        video = VideoFileClip(video_file)
+        text_bbox_width = video.w-padding*2
+        clips = [video]
 
-                # Create shadow
-                shadow_left = shadow_strength
-                while shadow_left >= 1:
-                    shadow_left -= 1
-                    shadow = create_shadow(line["text"], font_size, font, shadow_blur, opacity=1)
-                    shadow = shadow.with_start(caption["start"])
-                    shadow = shadow.with_duration(caption["end"] - caption["start"])
-                    shadow = shadow.with_position(pos)  # Use the calculated position
-                    clips.append(shadow)
+        captions = segment_parser.parse(
+            segments=segments,
+            fit_function=fit_function if fit_function else fits_frame(
+                line_count,
+                font,
+                font_size,
+                stroke_width,
+                text_bbox_width,
+            ),
+        )
 
-                if shadow_left > 0:
-                    shadow = create_shadow(line["text"], font_size, font, shadow_blur, opacity=shadow_left)
-                    shadow = shadow.with_start(caption["start"])
-                    shadow = shadow.with_duration(caption["end"] - caption["start"])
-                    shadow = shadow.with_position(pos)  # Use the calculated position
-                    clips.append(shadow)
+        for caption in captions:
+            captions_to_draw = []
+            if highlight_current_word:
+                for i, word in enumerate(caption["words"]):
+                    if i+1 < len(caption["words"]):
+                        end = caption["words"][i+1]["start"]
+                    else:
+                        end = word["end"]
 
-                # Create text
-                text = create_text_ex(
-                    word_list, 
-                    font_size, 
-                    font_color, 
-                    font, 
-                    stroke_color=stroke_color, 
-                    stroke_width=stroke_width,
-                    position=position
-                )
-                
-                text = text.with_position(pos)  # Use the calculated position
-                text = text.with_start(caption["start"])
-                text = text.with_duration(caption["end"] - caption["start"])
-                clips.append(text)
+                    captions_to_draw.append({
+                        "text": caption["text"],
+                        "start": word["start"],
+                        "end": end,
+                    })
+            else:
+                captions_to_draw.append(caption)
 
-                text_y_offset += line["height"]
+            for current_index, caption in enumerate(captions_to_draw):
+                line_data = calculate_lines(caption["text"], font, font_size, stroke_width, text_bbox_width)
+
+                # Calculate text_y_offset based on position
+                if position == "bottom":
+                    text_y_offset = video.h - line_data["height"] - padding
+                else:
+                    text_y_offset = video.h // 2 - line_data["height"] // 2
+
+                index = 0
+                for line in line_data["lines"]:
+                    pos = ("center", text_y_offset)
+
+                    words = line["text"].split()
+                    word_list = []
+                    for w in words:
+                        word_obj = Word(w)
+                        if highlight_current_word and index == current_index:
+                            word_obj.set_color(word_highlight_color)
+                        index += 1
+                        word_list.append(word_obj)
+
+                    # Create shadow
+                    shadow_left = shadow_strength
+                    while shadow_left >= 1:
+                        shadow_left -= 1
+                        shadow = create_shadow(line["text"], font_size, font, shadow_blur, opacity=1)
+                        shadow = shadow.with_start(caption["start"])
+                        shadow = shadow.with_duration(caption["end"] - caption["start"])
+                        shadow = shadow.with_position(pos)  # Use the calculated position
+                        clips.append(shadow)
+
+                    if shadow_left > 0:
+                        shadow = create_shadow(line["text"], font_size, font, shadow_blur, opacity=shadow_left)
+                        shadow = shadow.with_start(caption["start"])
+                        shadow = shadow.with_duration(caption["end"] - caption["start"])
+                        shadow = shadow.with_position(pos)  # Use the calculated position
+                        clips.append(shadow)
+
+                    # Create text
+                    text = create_text_ex(
+                        word_list, 
+                        font_size, 
+                        font_color, 
+                        font, 
+                        stroke_color=stroke_color, 
+                        stroke_width=stroke_width,
+                        position=position
+                    )
+                    
+                    text = text.with_position(pos)  # Use the calculated position
+                    text = text.with_start(caption["start"])
+                    text = text.with_duration(caption["end"] - caption["start"])
+                    clips.append(text)
+
+                    text_y_offset += line["height"]
 
     end_time = time.time()
     generation_time = end_time - _start_time

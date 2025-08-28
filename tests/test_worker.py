@@ -40,7 +40,8 @@ def test_worker_job_mode():
     {
       "type": "image",
       "narration_text": "Welcome to our amazing video tutorial!",
-      "prompt_image": "A professional tutorial setup with modern equipment",
+    "image_url": "https://pub-b3d68bfabb5742dabcd0275d1b282f2a.r2.dev/presus.png",
+
     "subtitle": True,
       "subtitle_config": {
         "font_size": 150, 
@@ -51,7 +52,8 @@ def test_worker_job_mode():
     {
       "type": "image",
       "narration_text": "Let's learn about advanced features",
-      "prompt_image": "Advanced technology concepts",
+    #   "prompt_image": "Advanced technology concepts",
+    "image_url": "https://pub-b3d68bfabb5742dabcd0275d1b282f2a.r2.dev/presus.png",
       "subtitle": True,
       "subtitle_config": {
         "font_size": 150, 
@@ -62,7 +64,9 @@ def test_worker_job_mode():
     {
       "type": "image",
       "narration_text": "This scene has no subtitle config",
-      "prompt_image": "Simple concept visualization",
+    #   "prompt_image": "Simple concept visualization",
+    "image_url": "https://pub-b3d68bfabb5742dabcd0275d1b282f2a.r2.dev/presus.png",
+
             "subtitle": True
     }
   ],
