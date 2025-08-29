@@ -21,7 +21,7 @@ def delete_task(task_id):
 def test_worker_job_mode():
     # 1. Create a task in the DB
     task_id = str(uuid.uuid4())
-    user_api_key = "test_api_key"
+    user_api_key = "78c33510dbea4817910ec221c48191c1"
     payload = {
   "output_filename": "video_with_global_subtitle_fallback.mp4",
   "global_subtitle_config": {
@@ -80,7 +80,7 @@ def test_worker_job_mode():
       },
    }
     create_task(task_id, user_api_key, payload)
-    print("PYTHONPATH=. python main_worker.py ", task_id)
+    print(f"PYTHONPATH=. python main_worker.py --task-id {task_id}  --api-key {user_api_key}")
 
     # 2. Run the worker as a subprocess (simulate Cloud Run Job)
     # result = subprocess.run(

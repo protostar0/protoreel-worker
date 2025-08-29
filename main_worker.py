@@ -7,6 +7,7 @@ import psutil
 import threading
 import time
 import gc
+import argparse
 from contextlib import contextmanager
 
 dotenv.load_dotenv()
@@ -17,6 +18,24 @@ logger = get_logger()
 current_task_id = None
 task_failed = False
 failure_reason = None
+
+def parse_arguments():
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(description='Protoreel Worker - Video Generation Service')
+    parser.add_argument('task_id', nargs='?', help='Task ID to process')
+    parser.add_argument('--api-key', dest='api_key', help='API key for authentication')
+    parser.add_argument('--task-id', dest='task_id_alt', help='Task ID (alternative to positional argument)')
+    parser.add_argument('--verbose', '-v', action='store_true', help='Enable verbose logging')
+    parser.add_argument('--debug', action='store_true', help='Enable debug mode')
+    parser.add_argument('--config', help='Path to configuration file')
+    
+    args = parser.parse_args()
+    
+    # Handle task_id from either positional argument or --task-id flag
+    if args.task_id_alt and not args.task_id:
+        args.task_id = args.task_id_alt
+    
+    return args
 
 def clear_cache():
     """Clear all cached files to prevent stale cache issues."""
@@ -314,6 +333,52 @@ def process_all_pending_tasks():
             update_task_status(task_id, 'finished', result=result)
             logger.info(f"[JOB MODE] Task {task_id} finished successfully. Result: {result}")
             
+            # Deduct credits for completed task
+            try:
+                from db import get_user_by_api_key, update_credits
+                
+                # Get the user's API key from the task
+                user_api_key = task.user_api_key
+                logger.info(f"[CREDITS] Deducting credits for user API key: {user_api_key[:8]}...")
+                
+                # Calculate credits to deduct based on completed scenes
+                credits_to_deduct = 0
+                if payload and 'scenes' in payload:
+                    scenes = payload['scenes']
+                    for scene in scenes:
+                        scene_type = scene.get('type', 'unknown')
+                        if scene_type == 'video':
+                            if scene.get('prompt_video'):
+                                credits_to_deduct += 5  # AI video generation
+                                logger.info(f"[CREDITS] Scene {scene_type}: AI video generation (5 credits)")
+                            elif scene.get('video_url'):
+                                credits_to_deduct += 1  # Existing video
+                                logger.info(f"[CREDITS] Scene {scene_type}: Existing video (1 credit)")
+                            else:
+                                credits_to_deduct += 1  # Default video scene
+                                logger.info(f"[CREDITS] Scene {scene_type}: Default video (1 credit)")
+                        else:
+                            credits_to_deduct += 1  # Image scenes
+                            logger.info(f"[CREDITS] Scene {scene_type}: Image scene (1 credit)")
+                
+                # Deduct credits from user account
+                if credits_to_deduct > 0:
+                    update_credits(user_api_key, -credits_to_deduct)
+                    logger.info(f"[CREDITS] Successfully deducted {credits_to_deduct} credits from user account")
+                    
+                    # Get updated user info for logging
+                    user_info = get_user_by_api_key(user_api_key)
+                    if user_info:
+                        remaining_credits = user_info.get('credits', 0)
+                        logger.info(f"[CREDITS] User remaining credits: {remaining_credits}")
+                else:
+                    logger.warning(f"[CREDITS] No credits calculated for deduction")
+                    
+            except Exception as credit_error:
+                logger.error(f"[CREDITS] Failed to deduct credits: {credit_error}")
+                # Don't fail the task for credit deduction errors
+                # The task completed successfully, credits can be handled separately
+            
             # Clear cache on successful completion
             clear_cache_on_completion()
             
@@ -327,6 +392,53 @@ def process_all_pending_tasks():
             try:
                 update_task_status(task_id, 'failed', error=error_msg)
                 logger.info(f"[JOB MODE] Task {task_id} marked as failed")
+                
+                # Refund any credits that were reserved for this failed task
+                try:
+                    from db import get_user_by_api_key, update_credits
+                    
+                    # Get the user's API key from the task
+                    user_api_key = task.user_api_key
+                    logger.info(f"[CREDITS] Processing credit refund for failed task, user API key: {user_api_key[:8]}...")
+                    
+                    # Calculate credits to refund based on failed task scenes
+                    credits_to_refund = 0
+                    if payload and 'scenes' in payload:
+                        scenes = payload['scenes']
+                        for scene in scenes:
+                            scene_type = scene.get('type', 'unknown')
+                            if scene_type == 'video':
+                                if scene.get('prompt_video'):
+                                    credits_to_refund += 5  # AI video generation
+                                    logger.info(f"[CREDITS] Failed scene {scene_type}: AI video generation (5 credits refund)")
+                                elif scene.get('video_url'):
+                                    credits_to_refund += 1  # Existing video
+                                    logger.info(f"[CREDITS] Failed scene {scene_type}: Existing video (1 credit refund)")
+                                else:
+                                    credits_to_refund += 1  # Default video scene
+                                    logger.info(f"[CREDITS] Failed scene {scene_type}: Default video (1 credit refund)")
+                            else:
+                                credits_to_refund += 1  # Image scenes
+                                logger.info(f"[CREDITS] Failed scene {scene_type}: Image scene (1 credit refund)")
+                    
+                    # Refund credits to user account
+                    if credits_to_refund > 0:
+                        update_credits(user_api_key, credits_to_refund)
+                        logger.info(f"[CREDITS] Successfully refunded {credits_to_refund} credits for failed task")
+                        
+                        # Get updated user info for logging
+                        user_info = get_user_by_api_key(user_api_key)
+                        if user_info:
+                            remaining_credits = user_info.get('credits', 0)
+                            logger.info(f"[CREDITS] User remaining credits after refund: {remaining_credits}")
+                    else:
+                        logger.warning(f"[CREDITS] No credits calculated for refund")
+                        
+                except Exception as credit_error:
+                    logger.error(f"[CREDITS] Failed to refund credits for failed task: {credit_error}")
+                    # Don't fail the error handling for credit refund errors
+                    # The task is already marked as failed
+                
             except Exception as update_error:
                 logger.error(f"[JOB MODE] Failed to update task status to failed: {update_error}")
             
@@ -341,6 +453,53 @@ def process_all_pending_tasks():
         logger.error(f"[JOB MODE] Task {task_id} failed due to external factor: {failure_reason}")
         try:
             update_task_status(task_id, 'failed', error=failure_reason)
+            
+            # Refund any credits that were reserved for this externally failed task
+            try:
+                from db import get_user_by_api_key, update_credits
+                
+                # Get the user's API key from the task
+                user_api_key = task.user_api_key
+                logger.info(f"[CREDITS] Processing credit refund for external failure, user API key: {user_api_key[:8]}...")
+                
+                # Calculate credits to refund based on failed task scenes
+                credits_to_refund = 0
+                if payload and 'scenes' in payload:
+                    scenes = payload['scenes']
+                    for scene in scenes:
+                        scene_type = scene.get('type', 'unknown')
+                        if scene_type == 'video':
+                            if scene.get('prompt_video'):
+                                credits_to_refund += 5  # AI video generation
+                                logger.info(f"[CREDITS] External failure scene {scene_type}: AI video generation (5 credits refund)")
+                            elif scene.get('video_url'):
+                                credits_to_refund += 1  # Existing video
+                                logger.info(f"[CREDITS] External failure scene {scene_type}: Existing video (1 credit refund)")
+                            else:
+                                credits_to_refund += 1  # Default video scene
+                                logger.info(f"[CREDITS] External failure scene {scene_type}: Default video (1 credit refund)")
+                        else:
+                            credits_to_refund += 1  # Image scenes
+                            logger.info(f"[CREDITS] External failure scene {scene_type}: Image scene (1 credit refund)")
+                
+                # Refund credits to user account
+                if credits_to_refund > 0:
+                    update_credits(user_api_key, credits_to_refund)
+                    logger.info(f"[CREDITS] Successfully refunded {credits_to_refund} credits for external failure")
+                    
+                    # Get updated user info for logging
+                    user_info = get_user_by_api_key(user_api_key)
+                    if user_info:
+                        remaining_credits = user_info.get('credits', 0)
+                        logger.info(f"[CREDITS] User remaining credits after external failure refund: {remaining_credits}")
+                else:
+                    logger.warning(f"[CREDITS] No credits calculated for external failure refund")
+                    
+            except Exception as credit_error:
+                logger.error(f"[CREDITS] Failed to refund credits for external failure: {credit_error}")
+                # Don't fail the error handling for credit refund errors
+                # The task is already marked as failed
+            
         except Exception as e:
             logger.error(f"[JOB MODE] Failed to update task status after external failure: {e}")
         
@@ -353,8 +512,32 @@ def process_all_pending_tasks():
     sys.exit(0)
 
 if __name__ == "__main__":
-    import sys
-    if len(sys.argv) < 2:
-        print("[ERROR] Usage: python main_worker.py <task_id>")
+    # Parse command line arguments
+    args = parse_arguments()
+    
+    # Set API key if provided
+    if args.api_key:
+        os.environ['API_KEY'] = args.api_key
+        logger.info("[ARGS] API key set from command line argument")
+    
+    # Set environment variables for other arguments
+    if args.verbose:
+        os.environ['VERBOSE'] = 'true'
+        logger.info("[ARGS] Verbose logging enabled")
+    
+    if args.debug:
+        os.environ['DEBUG'] = 'true'
+        logger.info("[ARGS] Debug mode enabled")
+    
+    if args.config:
+        os.environ['CONFIG_FILE'] = args.config
+        logger.info(f"[ARGS] Configuration file set to: {args.config}")
+    
+    # Check if task_id is provided
+    if not args.task_id:
+        print("[ERROR] Usage: python main_worker.py <task_id> or python main_worker.py --task-id <task_id>")
+        print("[ERROR] Optional: --api-key <key> --verbose --debug --config <file>")
         sys.exit(1)
+    
+    # Process the task
     process_all_pending_tasks() 
