@@ -555,6 +555,7 @@ def render_scene(scene: SceneInput, use_global_narration: bool = False, task_id:
                     word_highlight_color=word_highlight_color,
                     line_count=line_count,
                     position=position,
+                    task_id=task_id
                 )
                 video_clip = CompositeVideoClip([video_clip] + subtitle_clips)
                 logger.info("Subtitles added for scene narration.", extra={"task_id": task_id})

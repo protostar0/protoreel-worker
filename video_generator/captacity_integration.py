@@ -145,6 +145,7 @@ def generate_captacity_subtitles_for_scene(
         
         # Save the video clip to a temporary file
         temp_video_path = os.path.join(tempfile.gettempdir(), f"temp_scene_{task_id or 'unknown'}.mp4")
+        temp_video_path = os.path.abspath(temp_video_path)  # Ensure absolute path
         
         logger.info(f"Saving temporary video for subtitle processing: {temp_video_path}", extra={"task_id": task_id})
         
@@ -159,8 +160,24 @@ def generate_captacity_subtitles_for_scene(
             logger=None
         )
         
+        # Verify the temporary file was created
+        if not os.path.exists(temp_video_path):
+            raise RuntimeError(f"Failed to create temporary video file: {temp_video_path}")
+        
+        file_size = os.path.getsize(temp_video_path)
+        logger.info(f"Temporary video file created successfully: {temp_video_path} ({file_size} bytes)", extra={"task_id": task_id})
+        
+        # Double-check the file is accessible
+        try:
+            with open(temp_video_path, 'rb') as f:
+                f.read(1024)  # Read first 1KB to verify access
+            logger.info(f"Temporary video file is accessible and readable", extra={"task_id": task_id})
+        except Exception as e:
+            raise RuntimeError(f"Temporary video file is not accessible: {e}")
+        
         # Generate output path
         output_path = os.path.join(tempfile.gettempdir(), f"scene_with_subtitles_{task_id or 'unknown'}.mp4")
+        output_path = os.path.abspath(output_path)  # Ensure absolute path
         
         # Generate subtitles using Captacity
         result_path = generate_captacity_subtitles(
@@ -180,7 +197,13 @@ def generate_captacity_subtitles_for_scene(
             task_id=task_id
         )
         
-        # Clean up temporary video file
+        # Verify the result was generated successfully before cleanup
+        if not result_path or not os.path.exists(result_path):
+            raise RuntimeError(f"Captacity subtitle generation failed: output file not found at {result_path}")
+        
+        logger.info(f"Captacity subtitles generated successfully: {result_path}", extra={"task_id": task_id})
+        
+        # Clean up temporary video file ONLY after successful subtitle generation
         try:
             if os.path.exists(temp_video_path):
                 os.remove(temp_video_path)
@@ -290,7 +313,8 @@ def generate_captacity_subtitles_compatible(
     word_highlight_color: str = "red",
     line_count: int = 2,
     position: str = "center",
-    padding: int = 50
+    padding: int = 50,
+    task_id: Optional[str] = None
 ) -> List:
     """
     Compatible function that mimics the old generate_whisper_phrase_subtitles interface.
@@ -327,7 +351,7 @@ def generate_captacity_subtitles_compatible(
             line_count=line_count,
             position=position,
             padding=padding,
-            task_id=None
+            task_id=task_id
         )
         
         # Load the result as a clip

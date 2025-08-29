@@ -11,7 +11,7 @@ from video_generator.config import Config
 
 logger = logging.getLogger(__name__)
 
-def generate_image_from_prompt_gemini(prompt: str, out_path: str, model: str = "gemini-2.0-flash-preview-image-generation", 
+def generate_image_from_prompt_gemini(prompt: str, out_path: str, model: str = "gemini-2.5-flash-image-preview", 
                                     scene_context: dict = None, video_context: dict = None) -> str:
     """
     Generate an image from a text prompt using Google Gemini and save to out_path.
