@@ -270,17 +270,71 @@ def process_all_pending_tasks():
     
     logger.info("[JOB MODE] Starting process_all_pending_tasks...")
     
-    # Accept task_id as positional argument or --task-id=... flag
+    # Parse arguments manually for backward compatibility
     task_id = None
-    for arg in sys.argv[1:]:
-        if arg.startswith("--task-id="):
+    api_key = None
+    verbose = False
+    debug = False
+    config_file = None
+    
+    i = 1
+    while i < len(sys.argv):
+        arg = sys.argv[i]
+        
+        if arg == "--api-key" and i + 1 < len(sys.argv):
+            api_key = sys.argv[i + 1]
+            i += 2
+        elif arg.startswith("--api-key="):
+            api_key = arg.split("=", 1)[1]
+            i += 1
+        elif arg == "--task-id" and i + 1 < len(sys.argv):
+            task_id = sys.argv[i + 1]
+            i += 2
+        elif arg.startswith("--task-id="):
             task_id = arg.split("=", 1)[1]
-            break
+            i += 1
+        elif arg in ["--verbose", "-v"]:
+            verbose = True
+            i += 1
+        elif arg == "--debug":
+            debug = True
+            i += 1
+        elif arg == "--config" and i + 1 < len(sys.argv):
+            config_file = sys.argv[i + 1]
+            i += 2
+        elif arg.startswith("--config="):
+            config_file = arg.split("=", 1)[1]
+            i += 1
+        elif arg == "--help" or arg == "-h":
+            print("[JOB MODE] Usage: python main_worker.py <task_id> or --task-id=<task_id>")
+            print("[JOB MODE] Optional: --api-key <key> --verbose --debug --config <file>")
+            sys.exit(0)
         elif not arg.startswith("-") and task_id is None:
             task_id = arg
+            i += 1
+        else:
+            i += 1
+    
+    # Set environment variables for arguments
+    if api_key:
+        os.environ['API_KEY'] = api_key
+        logger.info("[ARGS] API key set from command line argument")
+    
+    if verbose:
+        os.environ['VERBOSE'] = 'true'
+        logger.info("[ARGS] Verbose logging enabled")
+    
+    if debug:
+        os.environ['DEBUG'] = 'true'
+        logger.info("[ARGS] Debug mode enabled")
+    
+    if config_file:
+        os.environ['CONFIG_FILE'] = config_file
+        logger.info(f"[ARGS] Configuration file set to: {config_file}")
     
     if not task_id:
         logger.error("[JOB MODE] No task_id provided. Usage: python main_worker.py <task_id> or --task-id=<task_id>")
+        logger.error("[JOB MODE] Optional: --api-key <key> --verbose --debug --config <file>")
         sys.exit(1)
     
     logger.info(f"[JOB MODE] Processing task_id: {task_id}")
