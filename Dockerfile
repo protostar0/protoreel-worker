@@ -17,7 +17,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy all code
 COPY . .
 
-# Change user
+# Create tmp directory for Captacity
+RUN mkdir -p /app/tmp
 
 # Run the worker
 ENTRYPOINT ["python", "main_worker.py"]

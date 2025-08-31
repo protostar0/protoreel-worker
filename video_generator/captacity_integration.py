@@ -19,11 +19,11 @@ def generate_captacity_subtitles(
     audio_path: str,
     output_path: str,
     font: str = "Bangers-Regular.ttf",
-    font_size: int = 100,
+    font_size: int = 90,
     font_color: str = "white",
     stroke_color: str = "black",
     stroke_width: int = 4,
-    position: str = "bottom",
+    position: str = "middle",
     task_id: Optional[str] = None,
     word_highlight_color: str = "red",
     line_count: int = 2,
@@ -59,8 +59,10 @@ def generate_captacity_subtitles(
         from captacity import add_captions
         
         # Use fixed directory instead of temporary files to avoid "tempfile not found" issues
+        # Use /app/tmp in Docker, ./tmp in local environment
+        tmp_dir = "/app/tmp" if os.path.exists("/app/tmp") else "./tmp"
         if not output_path:
-            output_path = os.path.join("./tmp", f"captacity_output_{uuid.uuid4()}_{os.path.basename(video_path)}")
+            output_path = os.path.join(tmp_dir, f"captacity_output_{uuid.uuid4()}_{os.path.basename(video_path)}")
         
         # Ensure output directory exists
         output_dir = os.path.dirname(output_path)
@@ -108,14 +110,14 @@ def generate_captacity_subtitles_for_scene(
     video_clip,
     audio_path: str,
     font: str = "Bangers-Regular.ttf",
-    font_size: int = 100,
+    font_size: int = 90,
     font_color: str = "white",
     stroke_color: str = "black",
     stroke_width: int = 4,
     highlight_current_word: bool = True,
     word_highlight_color: str = "red",
     line_count: int = 2,
-    position: str = "bottom",
+    position: str = "middle",
     padding: int = 50,
     task_id: Optional[str] = None
 ) -> str:
@@ -305,14 +307,14 @@ def generate_captacity_subtitles_compatible(
     audio_path: str, 
     video_clip, 
     font: str = "Bangers-Regular.ttf",
-    font_size: int = 130,
+    font_size: int = 90,
     font_color: str = "white",
     stroke_color: str = "black",
     stroke_width: int = 4,
     highlight_current_word: bool = True,
     word_highlight_color: str = "red",
     line_count: int = 2,
-    position: str = "center",
+    position: str = "middle",
     padding: int = 50,
     task_id: Optional[str] = None
 ) -> List:
