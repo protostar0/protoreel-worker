@@ -57,10 +57,9 @@ def generate_captacity_subtitles(
         # Import Captacity functions
         from captacity import add_captions
         
-        # Create temporary output path if none provided
+        # Use fixed directory instead of temporary files to avoid "tempfile not found" issues
         if not output_path:
-            temp_dir = tempfile.gettempdir()
-            output_path = os.path.join(temp_dir, f"captacity_output_{os.path.basename(video_path)}")
+            output_path = os.path.join("./tmp", f"captacity_output_{os.path.basename(video_path)}")
         
         # Ensure output directory exists
         output_dir = os.path.dirname(output_path)
@@ -143,8 +142,8 @@ def generate_captacity_subtitles_for_scene(
     try:
         logger.info(f"Generating Captacity subtitles for scene", extra={"task_id": task_id})
         
-        # Save the video clip to a temporary file
-        temp_video_path = os.path.join(tempfile.gettempdir(), f"temp_scene_{task_id or 'unknown'}.mp4")
+        # Save the video clip to a fixed directory instead of temporary files
+        temp_video_path = os.path.join("./tmp", f"temp_scene_{task_id or 'unknown'}.mp4")
         temp_video_path = os.path.abspath(temp_video_path)  # Ensure absolute path
         
         logger.info(f"Saving temporary video for subtitle processing: {temp_video_path}", extra={"task_id": task_id})
@@ -175,8 +174,8 @@ def generate_captacity_subtitles_for_scene(
         except Exception as e:
             raise RuntimeError(f"Temporary video file is not accessible: {e}")
         
-        # Generate output path
-        output_path = os.path.join(tempfile.gettempdir(), f"scene_with_subtitles_{task_id or 'unknown'}.mp4")
+        # Generate output path using fixed directory instead of temporary files
+        output_path = os.path.join("./tmp", f"scene_with_subtitles_{task_id or 'unknown'}.mp4")
         output_path = os.path.abspath(output_path)  # Ensure absolute path
         
         # Generate subtitles using Captacity
