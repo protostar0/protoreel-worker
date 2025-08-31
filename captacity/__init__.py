@@ -3,6 +3,7 @@ import subprocess
 import tempfile
 import time
 import os
+import uuid
 
 from . import segment_parser
 from . import transcriber
@@ -172,8 +173,8 @@ def add_captions(
         raise FileNotFoundError(f"Video file not found: {video_file}")
 
     # Keep the temp audio alive while ffmpeg/transcription run
-    with tempfile.TemporaryDirectory(prefix="captacity-") as tmpdir:
-        temp_audio_file = os.path.join(tmpdir, "audio.wav")
+    with tempfile.TemporaryDirectory(prefix=f"captacity-{uuid.uuid4()}-") as tmpdir:
+        temp_audio_file = os.path.join(tmpdir, f"audio_{uuid.uuid4()}.wav")
 
         # Extract mono 16 kHz WAV (good for Whisper and many ASR models)
         _run_ffmpeg([
@@ -242,7 +243,10 @@ def add_captions(
                 # Calculate text_y_offset based on position
                 if position == "bottom":
                     text_y_offset = video.h - line_data["height"] - padding
-                else:
+                elif position == "middle":
+                    # Position between bottom and center (25% from bottom)
+                    text_y_offset = video.h * 0.75 - line_data["height"] // 2
+                else:  # center
                     text_y_offset = video.h // 2 - line_data["height"] // 2
 
                 index = 0

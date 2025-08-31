@@ -2,6 +2,7 @@ from moviepy import TextClip, ImageClip, VideoClip, CompositeVideoClip
 from PIL import Image, ImageFilter, ImageFont
 import numpy
 import tempfile
+import uuid
 from typing import Union
 
 text_cache = {}
@@ -37,7 +38,7 @@ class TextClipEx(TextClip):
         self.text = kwargs["text"]
 
 def moviepy_to_pillow(clip) -> Image:
-    temp_file = tempfile.NamedTemporaryFile(suffix=".png").name
+    temp_file = tempfile.NamedTemporaryFile(suffix=f"_{uuid.uuid4()}.png").name
 
     clip.save_frame(temp_file)
     image = Image.open(temp_file)

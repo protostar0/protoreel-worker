@@ -7,6 +7,7 @@ Replaces the current Whisper-based subtitle generation with Captacity.
 import os
 import tempfile
 import logging
+import uuid
 from typing import List, Optional
 from pathlib import Path
 from video_generator.logging_utils import get_logger
@@ -41,7 +42,7 @@ def generate_captacity_subtitles(
         font_color: Color of the subtitle text
         stroke_color: Color of the text stroke/outline
         stroke_width: Width of the text stroke
-        position: Position of subtitles ("bottom", "center", "top")
+        position: Position of subtitles ("bottom", "middle", "center", "top")
         padding: Padding from the edge of the video
         task_id: Task ID for logging
         
@@ -59,7 +60,7 @@ def generate_captacity_subtitles(
         
         # Use fixed directory instead of temporary files to avoid "tempfile not found" issues
         if not output_path:
-            output_path = os.path.join("./tmp", f"captacity_output_{os.path.basename(video_path)}")
+            output_path = os.path.join("./tmp", f"captacity_output_{uuid.uuid4()}_{os.path.basename(video_path)}")
         
         # Ensure output directory exists
         output_dir = os.path.dirname(output_path)
@@ -132,7 +133,7 @@ def generate_captacity_subtitles_for_scene(
         highlight_current_word: Whether to highlight the current word
         word_highlight_color: Color for word highlighting
         line_count: Maximum number of lines for subtitles
-        position: Position of subtitles ("bottom", "center", "top")
+        position: Position of subtitles ("bottom", "middle", "center", "top")
         padding: Padding from the edge of the video
         task_id: Task ID for logging
         
@@ -143,7 +144,7 @@ def generate_captacity_subtitles_for_scene(
         logger.info(f"Generating Captacity subtitles for scene", extra={"task_id": task_id})
         
         # Save the video clip to a fixed directory instead of temporary files
-        temp_video_path = os.path.join("./tmp", f"temp_scene_{task_id or 'unknown'}.mp4")
+        temp_video_path = os.path.join("./tmp", f"temp_scene_{uuid.uuid4()}_{task_id or 'unknown'}.mp4")
         temp_video_path = os.path.abspath(temp_video_path)  # Ensure absolute path
         
         logger.info(f"Saving temporary video for subtitle processing: {temp_video_path}", extra={"task_id": task_id})
@@ -175,7 +176,7 @@ def generate_captacity_subtitles_for_scene(
             raise RuntimeError(f"Temporary video file is not accessible: {e}")
         
         # Generate output path using fixed directory instead of temporary files
-        output_path = os.path.join("./tmp", f"scene_with_subtitles_{task_id or 'unknown'}.mp4")
+        output_path = os.path.join("./tmp", f"scene_with_subtitles_{uuid.uuid4()}_{task_id or 'unknown'}.mp4")
         output_path = os.path.abspath(output_path)  # Ensure absolute path
         
         # Generate subtitles using Captacity
@@ -241,7 +242,7 @@ def create_captacity_subtitle_clips(
         font_color: Color of the subtitle text
         stroke_color: Color of the text stroke/outline
         stroke_width: Width of the text stroke
-        position: Position of subtitles ("bottom", "center", "top")
+        position: Position of subtitles ("bottom", "middle", "center", "top")
         padding: Padding from the edge of the video
         task_id: Task ID for logging
         
@@ -329,7 +330,7 @@ def generate_captacity_subtitles_compatible(
         highlight_current_word: Whether to highlight the current word
         word_highlight_color: Color for word highlighting
         line_count: Maximum number of lines for subtitles
-        position: Position of subtitles ("bottom", "center", "top")
+        position: Position of subtitles ("bottom", "middle", "center", "top")
         padding: Padding from the edge of the video
         
     Returns:
