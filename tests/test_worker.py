@@ -24,40 +24,18 @@ def test_worker_job_mode():
     user_api_key = "78c33510dbea4817910ec221c48191c1"
     payload = {
   "output_filename": "video_with_global_subtitle_fallback.mp4",
-  "global_subtitle_config": {
-    "font": "Bangers-Regular.ttf",
-    "font_size": 90,
-    "font_color": "yellow",
-    "stroke_color": "black",
-    "stroke_width": 3,
-    "highlight_current_word": True,
-    "word_highlight_color": "red",
-    "line_count": 2,
-    "position": "middle",
-    "padding": 50
-  },
   "scenes": [
     {
       "type": "image",
       "narration_text": "Welcome to our amazing video tutorial!",
       "prompt_image": "A photo-realistic image of a bustling New York City skyline with symbolic dollar signs and yen symbols overlayed, representing financial investment.",
     "subtitle": True,
-      "subtitle_config": {
-        "font_size": 90, 
-        "position": "middle", 
-        "font_color": "white" 
-      }
     },
     {
       "type": "image",
       "narration_text": "Let's learn about advanced features",
     "prompt_image": "A photo-realistic image of a bustling New York City skyline with symbolic dollar signs and yen symbols overlayed, representing financial investment.",
       "subtitle": True,
-      "subtitle_config": {
-        "font_size": 90, 
-        "position": "middle", 
-        "font_color": "white" 
-      }
     },
     {
       "type": "image",

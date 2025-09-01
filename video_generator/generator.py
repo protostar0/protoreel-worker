@@ -540,7 +540,7 @@ def render_scene(scene: SceneInput, use_global_narration: bool = False, task_id:
                 highlight_current_word = subtitle_config.get('highlight_current_word', True)
                 word_highlight_color = subtitle_config.get('word_highlight_color', 'yellow')
                 line_count = subtitle_config.get('line_count', 2)
-                position = subtitle_config.get('position', 'center')
+                position = subtitle_config.get('position', 'middle')
                 
                 logger.info(f"Subtitle config: font={font}, size={font_size}, color={font_color}, position={position}, highlight={highlight_current_word}", extra={"task_id": task_id})
                 

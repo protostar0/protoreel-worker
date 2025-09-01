@@ -150,7 +150,7 @@ def add_captions(
     fit_function = None,
 
     padding = 50,
-    position = "center",
+    position = "middle",
 
     shadow_strength = 1.0,
     shadow_blur = 0.1,

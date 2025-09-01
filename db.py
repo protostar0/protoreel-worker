@@ -179,6 +179,21 @@ if USE_SQL_DB:
             )
             db.add(task)
             db.commit()
+            
+            # Send Slack notification for task creation
+            try:
+                from slack_notifier import SlackNotifier
+                notifier = SlackNotifier()
+                notifier.send_task_creation_notification(
+                    task_id=task_id,
+                    user_api_key=user_api_key,
+                    payload=request_payload,
+                    log_uri=log_uri
+                )
+            except Exception as e:
+                # Log error but don't fail task creation
+                print(f"Warning: Failed to send task creation notification: {e}")
+            
             return task
         finally:
             db.close()

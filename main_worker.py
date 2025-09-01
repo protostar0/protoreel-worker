@@ -353,6 +353,21 @@ def process_all_pending_tasks():
     try:
         update_task_status(task_id, 'inprogress')
         logger.info(f"[JOB MODE] Task {task_id} status updated to inprogress")
+        
+        # Send Slack notification for task start
+        try:
+            from slack_notifier import SlackNotifier
+            notifier = SlackNotifier()
+            notifier.send_task_start_notification(
+                task_id=task_id,
+                user_api_key=task.user_api_key,
+                payload=task.request_payload,
+                log_uri=task.log_uri
+            )
+        except Exception as e:
+            # Log error but don't fail task processing
+            logger.warning(f"[SLACK] Failed to send task start notification: {e}")
+            
     except Exception as e:
         logger.error(f"[JOB MODE] Failed to update task status to inprogress: {e}")
         sys.exit(1)
@@ -589,9 +604,39 @@ if __name__ == "__main__":
     
     # Check if task_id is provided
     if not args.task_id:
-        print("[ERROR] Usage: python main_worker.py <task_id> or python main_worker.py --task-id <task_id>")
-        print("[ERROR] Optional: --api-key <key> --verbose --debug --config <file>")
-        sys.exit(1)
+        logger.info("[TIMEOUT CHECKER] No task_id provided, running timeout checker...")
+        
+        try:
+            # Import and run timeout checker
+            from timeout_checker import process_stuck_tasks
+            from slack_notifier import SlackNotifier
+            
+            # Process stuck tasks (update them to failed)
+            logger.info("[TIMEOUT CHECKER] Processing stuck tasks...")
+            timeout_result = process_stuck_tasks(
+                timeout_minutes=30, 
+                error_message="Timeout error: Task exceeded maximum processing time"
+            )
+            
+            # Send Slack notifications about failed tasks
+            logger.info("[TIMEOUT CHECKER] Sending Slack notifications...")
+            notifier = SlackNotifier()
+            slack_result = notifier.send_combined_notification(timeout_minutes=30)
+            
+            # Log results
+            logger.info(f"[TIMEOUT CHECKER] Timeout processing result: {timeout_result}")
+            logger.info(f"[TIMEOUT CHECKER] Slack notification result: {slack_result}")
+            
+            if timeout_result.get('stuck_found', 0) > 0 or slack_result.get('failed_tasks_count', 0) > 0:
+                logger.info(f"[TIMEOUT CHECKER] Found and processed {timeout_result.get('stuck_found', 0)} stuck tasks and {slack_result.get('failed_tasks_count', 0)} failed tasks")
+            else:
+                logger.info("[TIMEOUT CHECKER] No stuck or failed tasks found")
+                
+        except Exception as e:
+            logger.error(f"[TIMEOUT CHECKER] Error running timeout checker: {e}")
+            sys.exit(1)
+        
+        sys.exit(0)
     
     # Process the task
     process_all_pending_tasks() 
