@@ -1,16 +1,24 @@
 # ProtoReel Worker
 
-## 🎬 New Feature: Configurable Animations
+## 🎬 New Features: Animations & Transitions
 
-The ProtoReel Worker now supports configurable animations for image scenes! Add dynamic visual effects to your videos with:
+The ProtoReel Worker now supports configurable animations and smooth scene transitions! Create professional videos with:
 
+### Animations
 - **6 Animation Modes**: zoom_in, zoom_out, pulse, drift_up, drift_down, oscillate
 - **7 Animation Presets**: subtle, dynamic, smooth, gentle_drift, energetic, zoom_only, motion_only
 - **Random Animations**: Automatic random animation selection when no mode is specified
 - **Custom Parameters**: Fine-tune darkening, drift distance, and oscillation amplitude
 
+### Scene Transitions
+- **3 Transition Types**: crossfade, fade, none
+- **4 Transition Presets**: smooth, quick, dramatic, none
+- **Global & Per-Scene**: Apply transitions globally or customize per scene
+- **Smooth Flow**: Professional video flow between scenes
+
 ### Quick Examples
 
+#### Animations
 ```json
 {
   "type": "image",
@@ -28,7 +36,21 @@ The ProtoReel Worker now supports configurable animations for image scenes! Add 
 }
 ```
 
-See [ANIMATION_INTEGRATION.md](ANIMATION_INTEGRATION.md) for complete documentation.
+#### Transitions
+```json
+{
+  "output_filename": "my_video.mp4",
+  "global_transition_config": {
+    "transition_type": "crossfade",
+    "transition_duration": 1.5
+  },
+  "scenes": [
+    // Your scenes here
+  ]
+}
+```
+
+See [ANIMATION_INTEGRATION.md](ANIMATION_INTEGRATION.md) and [TRANSITION_INTEGRATION.md](TRANSITION_INTEGRATION.md) for complete documentation.
 
 ## Environment Variables Configuration
 

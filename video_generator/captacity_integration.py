@@ -152,9 +152,12 @@ def generate_captacity_subtitles_for_scene(
         logger.info(f"Saving temporary video for subtitle processing: {temp_video_path}", extra={"task_id": task_id})
         
         # Write video to temporary file
+        # Handle fps for different clip types
+        fps = getattr(video_clip, 'fps', None) or 24
+        
         video_clip.write_videofile(
             temp_video_path,
-            fps=video_clip.fps or 24,
+            fps=fps,
             codec="libx264",
             audio_codec="aac",
             temp_audiofile=f"{temp_video_path}.temp_audio.m4a",

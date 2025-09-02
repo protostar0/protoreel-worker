@@ -241,6 +241,9 @@ class SceneInput(BaseModel):
     animation_darken_factor: Optional[float] = 0.5  # Darkening factor (0.0 to 1.0)
     animation_drift_px: Optional[int] = 60  # Pixels for drift motion
     animation_osc_px: Optional[int] = 40  # Amplitude for oscillation
+    # Transition configuration
+    transition_type: Optional[str] = None  # Transition type for this scene
+    transition_duration: Optional[float] = 1.0  # Transition duration in seconds
     """
     image_provider:
         - "openai": Use OpenAI DALL-E
@@ -737,6 +740,16 @@ def generate_video_core(request_dict, task_id=None):
             else:
                 logger.info("No global subtitle config found", extra={"task_id": task_id})
             
+            # Handle global transition configuration
+            global_transition_config = request.get("global_transition_config", {})
+            global_transition_type = global_transition_config.get("transition_type", "crossfade")
+            global_transition_duration = global_transition_config.get("transition_duration", 1.0)
+            
+            if global_transition_config:
+                logger.info(f"Global transition config: type={global_transition_type}, duration={global_transition_duration}s", extra={"task_id": task_id})
+            else:
+                logger.info("No global transition config found, using defaults", extra={"task_id": task_id})
+            
             # Process scenes in parallel if multiple scenes
             if len(request["scenes"]) > 1:
                 logger.info(f"Processing {len(request['scenes'])} scenes in parallel", extra={"task_id": task_id})
@@ -829,12 +842,14 @@ def generate_video_core(request_dict, task_id=None):
             #         optimizer.optimize_memory()
             #         logger.info(f"Memory optimized after scene {i+1}", extra={"task_id": task_id})
             
-            # Concatenate video clips
-            from moviepy import VideoFileClip, concatenate_videoclips
+            # Concatenate video clips with transitions
+            from moviepy import VideoFileClip
+            from video_generator.transition_utils import concatenate_with_transitions, validate_transition_type
+            
             try:
                 logger.info(f"Loading scene video clips for concatenation.", extra={"task_id": task_id})
                 clips = [VideoFileClip(f) for f in scene_files]
-                logger.info(f"Concatenating {len(clips)} scene clips.", extra={"task_id": task_id})
+                logger.info(f"Concatenating {len(clips)} scene clips with transitions.", extra={"task_id": task_id})
                 
                 # Generate output filename
                 output_filename = request['output_filename']
@@ -844,7 +859,24 @@ def generate_video_core(request_dict, task_id=None):
                 os.makedirs(os.path.dirname(output_path), exist_ok=True)
                 
                 logger.info(f"Exporting final video to {output_path}", extra={"task_id": task_id})
-                final_clip = concatenate_videoclips(clips, method="compose")
+                
+                # Use transitions if configured
+                if len(clips) > 1 and global_transition_type != "none":
+                    if validate_transition_type(global_transition_type):
+                        final_clip = concatenate_with_transitions(
+                            clips, 
+                            transition_type=global_transition_type,
+                            transition_duration=global_transition_duration,
+                            task_id=task_id
+                        )
+                    else:
+                        logger.warning(f"Invalid transition type {global_transition_type}, using simple concatenation", extra={"task_id": task_id})
+                        from moviepy import concatenate_videoclips
+                        final_clip = concatenate_videoclips(clips, method="compose")
+                else:
+                    # No transitions needed
+                    from moviepy import concatenate_videoclips
+                    final_clip = concatenate_videoclips(clips, method="compose")
                 
                 # Enforce Instagram Reels duration limits
                 min_duration = 3
