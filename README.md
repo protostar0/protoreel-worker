@@ -1,5 +1,35 @@
 # ProtoReel Worker
 
+## 🎬 New Feature: Configurable Animations
+
+The ProtoReel Worker now supports configurable animations for image scenes! Add dynamic visual effects to your videos with:
+
+- **6 Animation Modes**: zoom_in, zoom_out, pulse, drift_up, drift_down, oscillate
+- **7 Animation Presets**: subtle, dynamic, smooth, gentle_drift, energetic, zoom_only, motion_only
+- **Random Animations**: Automatic random animation selection when no mode is specified
+- **Custom Parameters**: Fine-tune darkening, drift distance, and oscillation amplitude
+
+### Quick Examples
+
+```json
+{
+  "type": "image",
+  "prompt_image": "A beautiful sunset",
+  "animation_preset": "energetic"  // Use predefined animation
+}
+```
+
+```json
+{
+  "type": "image", 
+  "prompt_image": "A professional setup",
+  "animation_mode": ["zoom_in", "oscillate"],  // Custom combination
+  "animation_darken_factor": 0.3
+}
+```
+
+See [ANIMATION_INTEGRATION.md](ANIMATION_INTEGRATION.md) for complete documentation.
+
 ## Environment Variables Configuration
 
 ### Memory Monitoring Settings

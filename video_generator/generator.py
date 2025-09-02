@@ -2,7 +2,7 @@
 Core video generation logic for ProtoVideo.
 Handles orchestration, scene rendering, and helpers.
 """
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Union
 import os
 import uuid
 import tempfile
@@ -235,6 +235,12 @@ class SceneInput(BaseModel):
     subtitle: bool = False
     subtitle_config: Optional[Dict[str, Any]] = None  # Per-scene subtitle configuration
     logo: Optional[LogoConfig] = None  # Per-scene logo configuration
+    # Animation configuration
+    animation_mode: Optional[Union[str, List[str]]] = None  # Animation mode(s) for image scenes
+    animation_preset: Optional[str] = None  # Predefined animation preset
+    animation_darken_factor: Optional[float] = 0.5  # Darkening factor (0.0 to 1.0)
+    animation_drift_px: Optional[int] = 60  # Pixels for drift motion
+    animation_osc_px: Optional[int] = 40  # Amplitude for oscillation
     """
     image_provider:
         - "openai": Use OpenAI DALL-E
@@ -383,15 +389,42 @@ def render_scene(scene: SceneInput, use_global_narration: bool = False, task_id:
         duration = scene.duration
         try:
             logger.info(f"Creating ImageClip for {image_path}", extra={"task_id": task_id})
-            video_clip = ImageClip(image_path).with_duration(duration)
-            video_clip = video_clip.resized(height=REEL_SIZE[1])
-            if video_clip.w > REEL_SIZE[0]:
-                video_clip = video_clip.resized(width=REEL_SIZE[0])
-            def zoom(t):
-                return 1.0 + 0.5 * (t / duration)
-            video_clip = video_clip.resized(zoom)
-            video_clip = video_clip.with_background_color(size=REEL_SIZE, color=(0,0,0), pos='center')
-            video_clip = video_clip.with_effects([MultiplyColor(0.5)])
+            
+            # Import animation utilities
+            from video_generator.animation_utils import create_animated_image_clip, validate_animation_mode, get_animation_preset
+            
+            # Determine animation mode
+            animation_mode = None
+            if scene.animation_preset:
+                animation_mode = get_animation_preset(scene.animation_preset)
+                logger.info(f"Using animation preset: {scene.animation_preset} -> {animation_mode}", extra={"task_id": task_id})
+            elif scene.animation_mode:
+                animation_mode = scene.animation_mode
+                logger.info(f"Using custom animation mode: {animation_mode}", extra={"task_id": task_id})
+            
+            # Validate animation mode if provided
+            if animation_mode and not validate_animation_mode(animation_mode):
+                logger.warning(f"Invalid animation mode {animation_mode}, using random animation", extra={"task_id": task_id})
+                animation_mode = None
+            
+            # Get animation parameters
+            darken_factor = getattr(scene, 'animation_darken_factor', 0)
+            drift_px = getattr(scene, 'animation_drift_px', 60)
+            osc_px = getattr(scene, 'animation_osc_px', 40)
+            
+            # Create animated image clip
+            video_clip = create_animated_image_clip(
+                image_path=image_path,
+                duration=duration,
+                reel_size=REEL_SIZE,
+                mode=animation_mode,  # None = random animation
+                background_color=(0, 0, 0),
+                darken_factor=darken_factor,
+                drift_px=drift_px,
+                osc_px=osc_px,
+                task_id=task_id
+            )
+            
         except Exception as e:
             logger.error(f"Failed to create or process ImageClip: {e}", exc_info=True, extra={"task_id": task_id})
             raise

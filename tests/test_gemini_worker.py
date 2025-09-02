@@ -30,7 +30,8 @@ def test_gemini_default_provider():
     test_scene = {
         "type": "image",
         "prompt_image": "A test image",
-        "duration": 5
+        "duration": 5,
+        "animation_preset": "subtle"
     }
     
     scene_input = SceneInput(**test_scene)

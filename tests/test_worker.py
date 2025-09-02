@@ -23,25 +23,37 @@ def test_worker_job_mode():
     task_id = str(uuid.uuid4())
     user_api_key = "78c33510dbea4817910ec221c48191c1"
     payload = {
-  "output_filename": "dubai_experience.mp4",
+  "output_filename": "algeria_promo_video.mp4",
   "scenes": [
     {
       "type": "image",
-      "narration_text": "Experience the vibrant energy of Dubai, a city of contrasts where modern skyscrapers stand tall against ancient traditions.",
-      "prompt_image": "A panoramic view of Dubai's skyline at night, illuminated with colorful lights, reflecting in the calm waters of the Arabian Gulf, showcasing the iconic Burj Khalifa and other architectural marvels in stunning detail.",
+      "narration_text": "Explore the rich history and culture of Algeria, a North African country known for its diverse landscapes and vibrant traditions.",
+      "prompt_image": "A breathtaking aerial view of the Sahara Desert in Algeria, showcasing vast golden sand dunes under a clear blue sky, with camels peacefully roaming in the distance, creating a serene and timeless scene.",
       "subtitle": True
     },
     {
       "type": "image",
-      "narration_text": "Explore the bustling streets of Dubai filled with a diverse mix of locals and tourists, shopping in luxury boutiques and traditional souks.",
-      "prompt_image": "A busy marketplace in Dubai with vendors selling spices, textiles, and gold under vibrant awnings, surrounded by a mix of people in modern and traditional attire, captured in a dynamic street scene with intricate details.",
+      "narration_text": "Discover the architectural wonders of Algeria, blending ancient ruins with modern structures that reflect the country's unique heritage.",
+      "prompt_image": "An intricate close-up shot of the iconic Casbah of Algiers, featuring narrow winding streets, white-washed buildings with blue accents, and locals going about their day, evoking a sense of community and tradition.",
       "subtitle": True
     },
     {
       "type": "image",
-      "narration_text": "Indulge in the luxurious lifestyle of Dubai with world-class dining, entertainment, and relaxation options.",
-      "prompt_image": "A lavish beachfront resort in Dubai with crystal-clear waters, palm trees swaying in the gentle breeze, and guests enjoying cocktails by the pool in a sophisticated setting, all depicted with exquisite attention to detail.",
+      "narration_text": "Experience the vibrant colors and flavors of Algerian cuisine, a delightful fusion of Mediterranean and African influences.",
+      "prompt_image": "A mouth-watering display of traditional Algerian dishes, including couscous, tagines, and baklava, beautifully arranged on a table with vibrant spices, fresh herbs, and decorative pottery, creating an inviting and appetizing scene.",
       "subtitle": True
+    },
+    {
+      "type": "image",
+      "narration_text": "Immerse yourself in the natural beauty of Algeria, from lush coastal areas to rugged mountain ranges and picturesque oases.",
+      "prompt_image": "A stunning panoramic view of the Tassili n'Ajjer National Park, featuring ancient rock formations, lush vegetation, and a tranquil desert oasis, with clear blue skies overhead and a sense of peaceful solitude.",
+      "subtitle": True
+    },
+    {
+      "type": "image",
+      "narration_text": "Celebrate the warmth and hospitality of the Algerian people, known for their welcoming spirit and rich cultural traditions.",
+      "prompt_image": "A heartwarming scene of a traditional Algerian family gathering, with generations sharing laughter and stories around a beautifully set table, adorned with colorful textiles and decorative ornaments, capturing the essence of togetherness and joy.",
+        "subtitle": True
     }
   ]
 }
@@ -87,7 +99,11 @@ def test_worker_process_task():
                 "narration_text": "In a monumental announcement, President Donald Trump has revealed a massive trade deal with Japan, calling it the 'largest deal in history with Japan.' This landmark agreement promises to reshape global economic partnerships.",
                 "prompt_image": "A photo-realistic image of President holding a press conference with the flags of the United States and Japan in the background, emphasizing a momentous announcement.",
                 "image_provider": "gemini",
-                "subtitle": True
+                "subtitle": True,
+                "animation_preset": "energetic",
+                "animation_darken_factor": 0.3,
+                "animation_drift_px": 65,
+                "animation_osc_px": 40
             },
             # {
             #     "type": "image",
