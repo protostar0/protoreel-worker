@@ -75,13 +75,16 @@ def build_enhanced_prompt(base_prompt: str, scene_context: dict = None, video_co
     enhanced_parts.append("- High contrast and vibrant colors for social media")
     enhanced_parts.append("- Professional composition with clear focal points")
     enhanced_parts.append("- Modern, engaging visual style")
+    enhanced_parts.append("- No text or logos in the image, only the image itself. The image should be a single image, not a composition of multiple images.")
+    enhanced_parts.append("")
+    
     
     # Add video context if available
     if video_context:
         if video_context.get('narration_text'):
             enhanced_parts.append(f"- Visual theme related to: {video_context['narration_text'][:100]}...")
         if video_context.get('theme'):
-            enhanced_parts.append(f"- Overall video theme: {video_context['theme']}")
+            enhanced_parts.append(f"- the image should be related to the video scene {video_context['theme']}")
     
     # Add scene context if available
     if scene_context:

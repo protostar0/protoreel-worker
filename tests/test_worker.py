@@ -23,36 +23,28 @@ def test_worker_job_mode():
     task_id = str(uuid.uuid4())
     user_api_key = "78c33510dbea4817910ec221c48191c1"
     payload = {
-  "output_filename": "video_with_global_subtitle_fallback.mp4",
+  "output_filename": "dubai_experience.mp4",
   "scenes": [
     {
       "type": "image",
-      "narration_text": "Welcome to our amazing video tutorial!",
-      "prompt_image": "A photo-realistic image of a bustling New York City skyline with symbolic dollar signs and yen symbols overlayed, representing financial investment.",
-    "subtitle": True,
+      "narration_text": "Experience the vibrant energy of Dubai, a city of contrasts where modern skyscrapers stand tall against ancient traditions.",
+      "prompt_image": "A panoramic view of Dubai's skyline at night, illuminated with colorful lights, reflecting in the calm waters of the Arabian Gulf, showcasing the iconic Burj Khalifa and other architectural marvels in stunning detail.",
+      "subtitle": True
     },
     {
       "type": "image",
-      "narration_text": "Let's learn about advanced features",
-    "prompt_image": "A photo-realistic image of a bustling New York City skyline with symbolic dollar signs and yen symbols overlayed, representing financial investment.",
-      "subtitle": True,
+      "narration_text": "Explore the bustling streets of Dubai filled with a diverse mix of locals and tourists, shopping in luxury boutiques and traditional souks.",
+      "prompt_image": "A busy marketplace in Dubai with vendors selling spices, textiles, and gold under vibrant awnings, surrounded by a mix of people in modern and traditional attire, captured in a dynamic street scene with intricate details.",
+      "subtitle": True
     },
     {
       "type": "image",
-      "narration_text": "This scene has no subtitle config",
-      "prompt_image": "Simple concept visualization",
-            "subtitle": True
+      "narration_text": "Indulge in the luxurious lifestyle of Dubai with world-class dining, entertainment, and relaxation options.",
+      "prompt_image": "A lavish beachfront resort in Dubai with crystal-clear waters, palm trees swaying in the gentle breeze, and guests enjoying cocktails by the pool in a sophisticated setting, all depicted with exquisite attention to detail.",
+      "subtitle": True
     }
-  ],
-      "logo":{
-         "url":"https://pub-b3d68bfabb5742dabcd0275d1b282f2a.r2.dev/f83ba57b-4730-4e67-b549-eac4ac857cda.png",
-         "position":"bottom-right",
-         "opacity":0.5,
-         "size":(200,200),
-            "show_in_all_scenes":True,
-         "cta_screen":True
-      },
-   }
+  ]
+}
     create_task(task_id, user_api_key, payload)
     print(f"PYTHONPATH=. python main_worker.py --task-id {task_id}  --api-key {user_api_key}")
 

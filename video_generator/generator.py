@@ -761,7 +761,7 @@ def generate_video_core(request_dict, task_id=None):
                         # Create video context
                         video_context = {
                             "narration_text": request.get("narration_text"),
-                            "theme": request.get("theme"),
+                            "theme": request.get("scenes"),
                             "output_filename": request.get("output_filename")
                         }
                         
