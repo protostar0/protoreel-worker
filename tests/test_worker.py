@@ -23,37 +23,219 @@ def test_worker_job_mode():
     task_id = str(uuid.uuid4())
     user_api_key = "78c33510dbea4817910ec221c48191c1"
     payload = {
-  "output_filename": "algeria_promo_video.mp4",
+  "output_filename": "comprehensive_text_overlay_demo.mp4",
   "scenes": [
+    # Scene 1: Title preset with top position
     {
       "type": "image",
-      "narration_text": "Explore the rich history and culture of Algeria, a North African country known for its diverse landscapes and vibrant traditions.",
-      "prompt_image": "A breathtaking aerial view of the Sahara Desert in Algeria, showcasing vast golden sand dunes under a clear blue sky, with camels peacefully roaming in the distance, creating a serene and timeless scene.",
-      "subtitle": True
+      "prompt_image": "A majestic mountain landscape at sunrise",
+      "duration": 6,
+      "text": {
+        "content": "MOUNTAIN ADVENTURE",
+        "preset": "title",
+        "position": "top"
+      }
     },
+    
+    # Scene 2: Custom configuration with center position
     {
-      "type": "image",
-      "narration_text": "Discover the architectural wonders of Algeria, blending ancient ruins with modern structures that reflect the country's unique heritage.",
-      "prompt_image": "An intricate close-up shot of the iconic Casbah of Algiers, featuring narrow winding streets, white-washed buildings with blue accents, and locals going about their day, evoking a sense of community and tradition.",
-      "subtitle": True
+      "type": "image", 
+      "prompt_image": "A bustling city street with neon lights",
+      "duration": 6,
+      "text": {
+        "content": "Urban Life",
+        "position": "center",
+        "fontsize": 80,
+        "color": "yellow",
+        "stroke_color": "black",
+        "stroke_width": 3
+      }
     },
+    
+    # Scene 3: Subtitle preset with bottom position
     {
       "type": "image",
-      "narration_text": "Experience the vibrant colors and flavors of Algerian cuisine, a delightful fusion of Mediterranean and African influences.",
-      "prompt_image": "A mouth-watering display of traditional Algerian dishes, including couscous, tagines, and baklava, beautifully arranged on a table with vibrant spices, fresh herbs, and decorative pottery, creating an inviting and appetizing scene.",
-      "subtitle": True
+      "prompt_image": "A peaceful beach with crystal clear water",
+      "duration": 6,
+      "text": {
+        "content": "Tranquility Awaits",
+        "preset": "subtitle",
+        "position": "bottom"
+      }
     },
+    
+    # Scene 4: Caption preset with bottom-left position
     {
       "type": "image",
-      "narration_text": "Immerse yourself in the natural beauty of Algeria, from lush coastal areas to rugged mountain ranges and picturesque oases.",
-      "prompt_image": "A stunning panoramic view of the Tassili n'Ajjer National Park, featuring ancient rock formations, lush vegetation, and a tranquil desert oasis, with clear blue skies overhead and a sense of peaceful solitude.",
-      "subtitle": True
+      "prompt_image": "A modern office building with glass facade",
+      "duration": 6,
+      "text": {
+        "content": "Professional Excellence",
+        "preset": "caption",
+        "position": "bottom-left"
+      }
     },
+    
+    # Scene 5: Callout preset with center position
     {
       "type": "image",
-      "narration_text": "Celebrate the warmth and hospitality of the Algerian people, known for their welcoming spirit and rich cultural traditions.",
-      "prompt_image": "A heartwarming scene of a traditional Algerian family gathering, with generations sharing laughter and stories around a beautifully set table, adorned with colorful textiles and decorative ornaments, capturing the essence of togetherness and joy.",
-        "subtitle": True
+      "prompt_image": "A vibrant marketplace with colorful stalls",
+      "duration": 6,
+      "text": {
+        "content": "SPECIAL OFFER!",
+        "preset": "callout",
+        "position": "center"
+      }
+    },
+    
+    # Scene 6: Watermark preset with bottom-right position
+    {
+      "type": "image",
+      "prompt_image": "A serene forest path with dappled sunlight",
+      "duration": 6,
+      "text": {
+        "content": "© 2024 ProtoReel",
+        "preset": "watermark",
+        "position": "bottom-right"
+      }
+    },
+    
+    # Scene 7: Top-left position with custom styling
+    {
+      "type": "image",
+      "prompt_image": "A futuristic city skyline at night",
+      "duration": 6,
+      "text": {
+        "content": "Future City",
+        "position": "top-left",
+        "fontsize": 60,
+        "color": "cyan",
+        "stroke_color": "darkblue",
+        "stroke_width": 2
+      }
+    },
+    
+    # Scene 8: Top-right position with custom styling
+    {
+      "type": "image",
+      "prompt_image": "A cozy coffee shop interior",
+      "duration": 6,
+      "text": {
+        "content": "Coffee Time",
+        "position": "top-right",
+        "fontsize": 50,
+        "color": "brown",
+        "stroke_color": "white",
+        "stroke_width": 1
+      }
+    },
+    
+    # Scene 9: Custom configuration with fade_in animation
+    {
+      "type": "image",
+      "prompt_image": "A starry night sky with aurora borealis",
+      "duration": 6,
+      "text": {
+        "content": "Magical Night",
+        "position": "center",
+        "fontsize": 70,
+        "color": "purple",
+        "stroke_color": "white",
+        "stroke_width": 2,
+        "animation_type": "fade_in"
+      }
+    },
+    
+    # Scene 10: Custom configuration with fade_out animation
+    {
+      "type": "image",
+      "prompt_image": "A sunset over calm ocean waters",
+      "duration": 6,
+      "text": {
+        "content": "Peaceful Sunset",
+        "position": "center",
+        "fontsize": 65,
+        "color": "orange",
+        "stroke_color": "darkred",
+        "stroke_width": 2,
+        "animation_type": "fade_out"
+      }
+    },
+    
+    # Scene 11: Custom configuration with fade_in_out animation
+    {
+      "type": "image",
+      "prompt_image": "A field of blooming sunflowers",
+      "duration": 6,
+      "text": {
+        "content": "Nature's Beauty",
+        "position": "center",
+        "fontsize": 75,
+        "color": "gold",
+        "stroke_color": "darkgreen",
+        "stroke_width": 3,
+        "animation_type": "fade_in_out"
+      }
+    },
+    
+    # Scene 12: Large font size test
+    {
+      "type": "image",
+      "prompt_image": "A dramatic stormy sky with lightning",
+      "duration": 6,
+      "text": {
+        "content": "POWER",
+        "position": "center",
+        "fontsize": 120,
+        "color": "white",
+        "stroke_color": "black",
+        "stroke_width": 4
+      }
+    },
+    
+    # Scene 13: Small font size test
+    {
+      "type": "image",
+      "prompt_image": "A delicate flower garden",
+      "duration": 6,
+      "text": {
+        "content": "Delicate Details",
+        "position": "bottom",
+        "fontsize": 20,
+        "color": "pink",
+        "stroke_color": "white",
+        "stroke_width": 1
+      }
+    },
+    
+    # Scene 14: Multiple colors and stroke combinations
+    {
+      "type": "image",
+      "prompt_image": "A rainbow over rolling hills",
+      "duration": 6,
+      "text": {
+        "content": "Colorful World",
+        "position": "center",
+        "fontsize": 55,
+        "color": "red",
+        "stroke_color": "yellow",
+        "stroke_width": 3
+      }
+    },
+    
+    # Scene 15: No stroke test
+    {
+      "type": "image",
+      "prompt_image": "A minimalist white room with soft lighting",
+      "duration": 6,
+      "text": {
+        "content": "Minimalist Design",
+        "position": "center",
+        "fontsize": 45,
+        "color": "black",
+        "stroke_color": "none",
+        "stroke_width": 0
+      }
     }
   ]
 }

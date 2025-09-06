@@ -28,9 +28,15 @@ REEL_SIZE = Config.REEL_SIZE
 
 class TextOverlay(BaseModel):
     content: str
-    position: str = "center"
+    position: str = "center"  # top, top-left, top-right, center, bottom, bottom-left, bottom-right
     fontsize: int = 36
     color: str = "white"
+    stroke_color: str = "black"
+    stroke_width: int = 2
+    font: Optional[str] = None  # Use None for default font
+    padding: int = 20  # Padding from edges in pixels
+    animation_type: str = "none"  # fade_in, fade_out, fade_in_out, none
+    preset: Optional[str] = None  # title, subtitle, caption, callout, watermark
 
 class LogoConfig(BaseModel):
     url: str
@@ -597,6 +603,69 @@ def render_scene(scene: SceneInput, use_global_narration: bool = False, task_id:
                 logger.info("Subtitles added for scene narration.", extra={"task_id": task_id})
             except Exception as e:
                 logger.warning(f"Subtitle generation failed for scene: {e}", exc_info=True, extra={"task_id": task_id})
+        
+        # Add text overlay if configured
+        if scene.text:
+            try:
+                logger.info(f"Adding text overlay to scene: '{scene.text.content}'", extra={"task_id": task_id})
+                
+                from video_generator.captacity_text_overlay import (
+                    add_captacity_text_overlay_to_clip, 
+                    validate_text_position, 
+                    get_text_preset
+                )
+                
+                # Validate text position
+                if not validate_text_position(scene.text.position):
+                    logger.warning(f"Invalid text position '{scene.text.position}', using center", extra={"task_id": task_id})
+                    scene.text.position = "center"
+                
+                # Get text configuration
+                if scene.text.preset:
+                    # Use preset configuration
+                    preset_config = get_text_preset(scene.text.preset)
+                    text_config = {
+                        "position": preset_config["position"],
+                        "font_size": preset_config["font_size"],
+                        "color": preset_config["color"],
+                        "stroke_color": preset_config["stroke_color"],
+                        "stroke_width": preset_config["stroke_width"],
+                        "padding": preset_config.get("padding", 20),
+                        "opacity": preset_config.get("opacity", 1.0)
+                    }
+                    logger.info(f"Using text preset: {scene.text.preset}", extra={"task_id": task_id})
+                else:
+                    # Use custom configuration
+                    text_config = {
+                        "position": scene.text.position,
+                        "font_size": scene.text.fontsize,
+                        "color": scene.text.color,
+                        "stroke_color": scene.text.stroke_color,
+                        "stroke_width": scene.text.stroke_width,
+                        "font": scene.text.font,
+                        "padding": getattr(scene.text, 'padding', 20),
+                        "opacity": getattr(scene.text, 'opacity', 1.0)
+                    }
+                
+                # Add text overlay to video clip
+                video_clip = add_captacity_text_overlay_to_clip(
+                    video_clip=video_clip,
+                    text=scene.text.content,
+                    position=text_config["position"],
+                    font_size=text_config["font_size"],
+                    color=text_config["color"],
+                    stroke_color=text_config["stroke_color"],
+                    stroke_width=text_config["stroke_width"],
+                    font=text_config.get("font", None),
+                    padding=text_config.get("padding", 20),
+                    opacity=text_config.get("opacity", 1.0),
+                    task_id=task_id
+                )
+                
+                logger.info("Text overlay added to scene successfully.", extra={"task_id": task_id})
+                
+            except Exception as e:
+                logger.warning(f"Text overlay generation failed for scene: {e}", exc_info=True, extra={"task_id": task_id})
         
         # Add logo if configured for this scene
         if scene.logo:

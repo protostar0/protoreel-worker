@@ -40,7 +40,8 @@ class TextClipEx(TextClip):
 def moviepy_to_pillow(clip) -> Image:
     temp_file = tempfile.NamedTemporaryFile(suffix=f"_{uuid.uuid4()}.png").name
 
-    clip.save_frame(temp_file)
+    # clip.save_frame(temp_file)
+    clip.save_frame(f"./tmp/image_text_{uuid.uuid4()}.png")
     image = Image.open(temp_file)
     return image
 
@@ -55,6 +56,7 @@ def get_text_size_ex(text, font, font_size, stroke_width):
 def blur_text_clip(text_clip, blur_radius: int) -> VideoClip:
     # Convert TextClip to a PIL image
     pil_img = moviepy_to_pillow(text_clip)
+    pil_img.save(f"./tmp/image_text_{uuid.uuid4()}.png")
 
     # Offset blur to make it centered
     offset = int(blur_radius * 0.6)
@@ -79,7 +81,7 @@ def create_text(
     color: str,
     font: str,
     bg_color: Union[str, None] = None,
-    blur_radius: int = 0,
+    blur_radius: int = 1,
     opacity: float = 1.0,
     stroke_color: Union[str, None] = None,
     stroke_width: int = 1,
@@ -91,7 +93,7 @@ def create_text(
     if arg_hash in text_cache:
         return text_cache[arg_hash].copy()
 
-    text_clip = TextClipEx(text=text, font_size=font_size, color=color, bg_color=bg_color, font=font, stroke_color=stroke_color, stroke_width=stroke_width, margin=(0,0,0,20))  
+    text_clip = TextClipEx(text=text, font_size=font_size, color=color, bg_color=bg_color, font=font, stroke_color=stroke_color, stroke_width=stroke_width, margin=(0,0,0,90))  
     text_clip = text_clip.with_opacity(opacity)
 
     if blur_radius:

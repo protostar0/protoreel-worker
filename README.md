@@ -16,6 +16,12 @@ The ProtoReel Worker now supports configurable animations and smooth scene trans
 - **Global & Per-Scene**: Apply transitions globally or customize per scene
 - **Smooth Flow**: Professional video flow between scenes
 
+### Text Overlays
+- **5 Text Types**: title, subtitle, caption, callout, watermark
+- **7 Positions**: top, center, bottom, and corner positions
+- **4 Animations**: fade_in, fade_out, fade_in_out, none
+- **Rich Styling**: Custom fonts, colors, strokes, and presets
+
 ### Quick Examples
 
 #### Animations
@@ -50,7 +56,21 @@ The ProtoReel Worker now supports configurable animations and smooth scene trans
 }
 ```
 
-See [ANIMATION_INTEGRATION.md](ANIMATION_INTEGRATION.md) and [TRANSITION_INTEGRATION.md](TRANSITION_INTEGRATION.md) for complete documentation.
+#### Text Overlays
+```json
+{
+  "type": "image",
+  "prompt_image": "A beautiful scene",
+  "duration": 8,
+  "text": {
+    "content": "Welcome to Our Journey",
+    "preset": "title",
+    "animation_type": "fade_in"
+  }
+}
+```
+
+See [ANIMATION_INTEGRATION.md](ANIMATION_INTEGRATION.md), [TRANSITION_INTEGRATION.md](TRANSITION_INTEGRATION.md), and [TEXT_OVERLAY_INTEGRATION.md](TEXT_OVERLAY_INTEGRATION.md) for complete documentation.
 
 ## Environment Variables Configuration
 
