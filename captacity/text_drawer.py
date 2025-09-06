@@ -41,7 +41,7 @@ def moviepy_to_pillow(clip) -> Image:
     temp_file = tempfile.NamedTemporaryFile(suffix=f"_{uuid.uuid4()}.png").name
 
     # clip.save_frame(temp_file)
-    clip.save_frame(f"./tmp/image_text_{uuid.uuid4()}.png")
+    clip.save_frame(temp_file)
     image = Image.open(temp_file)
     return image
 

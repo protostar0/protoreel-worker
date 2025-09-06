@@ -23,221 +23,152 @@ def test_worker_job_mode():
     task_id = str(uuid.uuid4())
     user_api_key = "78c33510dbea4817910ec221c48191c1"
     payload = {
-  "output_filename": "comprehensive_text_overlay_demo.mp4",
+  "output_filename": "plum_health_benefits.mp4",
   "scenes": [
-    # Scene 1: Title preset with top position
+    {
+      "type": "video",
+      "image_url": None,
+      "prompt_image": None,
+      "prompt_edit_image": None,
+      "image_provider": "gemini",
+      "video_url": "https://videos.pexels.com/video-files/8802370/8802370-sd_360_640_30fps.mp4",
+      "prompt_video": None,
+      "video_resolution": "1080p",
+      "video_aspect_ratio": "16:9",
+      "video_duration": "10s",
+      "video_model": "ray-2",
+      "narration": None,
+      "narration_text": "Start your day with a juicy plum, bursting with antioxidants and vitamins to boost heart health and immunity.",
+      "audio_prompt_url": None,
+      "music": None,
+      "music_volume": 0.25,
+      "duration": None,
+      "text": None,
+      "subtitle": True,
+      "subtitle_config": None,
+      "logo": None
+    },
     {
       "type": "image",
-      "prompt_image": "A majestic mountain landscape at sunrise",
-      "duration": 6,
-      "text": {
-        "content": "MOUNTAIN ADVENTURE",
-        "preset": "title",
-        "position": "top"
-      }
+      "image_url": None,
+      "prompt_image": "A colorful fruit salad bowl featuring sliced plums, strawberries, and kiwi, sprinkled with chia seeds and drizzled with honey, presented on a white background with a modern aesthetic.",
+      "prompt_edit_image": None,
+      "image_provider": "gemini",
+      "video_url": None,
+      "prompt_video": None,
+      "video_resolution": "1080p",
+      "video_aspect_ratio": "16:9",
+      "video_duration": "10s",
+      "video_model": "ray-2",
+      "narration": None,
+      "narration_text": "Plums are a powerhouse of nutrients like vitamin C, potassium, and fiber, essential for overall well-being and weight management.",
+      "audio_prompt_url": None,
+      "music": None,
+      "music_volume": 0.25,
+      "duration": None,
+      "text": None,
+      "subtitle": True, 
+      "subtitle_config": None,
+      "logo": None
     },
-    
-    # Scene 2: Custom configuration with center position
     {
-      "type": "image", 
-      "prompt_image": "A bustling city street with neon lights",
-      "duration": 6,
-      "text": {
-        "content": "Urban Life",
-        "position": "center",
-        "fontsize": 80,
-        "color": "yellow",
-        "stroke_color": "black",
-        "stroke_width": 3
-      }
+      "type": "video",
+      "image_url": None,
+      "prompt_image": None,
+      "prompt_edit_image": None,
+      "image_provider": "gemini",
+      "video_url": "https://videos.pexels.com/video-files/3021947/3021947-hd_1920_1080_30fps.mp4",
+      "prompt_video": None,
+      "video_resolution": "1080p",
+      "video_aspect_ratio": "16:9",
+      "video_duration": "10s",
+      "video_model": "ray-2",
+      "narration": None,
+      "narration_text": "Discover the bone-strengthening benefits of plums with a delicious prune snack, rich in polyphenols and vitamin K for optimal health.",
+      "audio_prompt_url": None,
+      "music": None,
+      "music_volume": 0.25,
+      "duration": None,
+      "text": None,
+      "subtitle": True,
+      "subtitle_config": None,
+      "logo": None
     },
-    
-    # Scene 3: Subtitle preset with bottom position
-    {
-      "type": "image",
-      "prompt_image": "A peaceful beach with crystal clear water",
-      "duration": 6,
-      "text": {
-        "content": "Tranquility Awaits",
-        "preset": "subtitle",
-        "position": "bottom"
-      }
-    },
-    
-    # Scene 4: Caption preset with bottom-left position
-    {
-      "type": "image",
-      "prompt_image": "A modern office building with glass facade",
-      "duration": 6,
-      "text": {
-        "content": "Professional Excellence",
-        "preset": "caption",
-        "position": "bottom-left"
-      }
-    },
-    
-    # Scene 5: Callout preset with center position
     {
       "type": "image",
-      "prompt_image": "A vibrant marketplace with colorful stalls",
-      "duration": 6,
-      "text": {
-        "content": "SPECIAL OFFER!",
-        "preset": "callout",
-        "position": "center"
-      }
+      "image_url": None,
+      "prompt_image": "A serene shot of a person holding a plum while reading a book in a cozy library setting, with warm ambient lighting and a stack of books in the background, creating a peaceful atmosphere.",
+      "prompt_edit_image": None,
+      "image_provider": "gemini",
+      "video_url": None,
+      "prompt_video": None,
+      "video_resolution": "1080p",
+      "video_aspect_ratio": "16:9",
+      "video_duration": "10s",
+      "video_model": "ray-2",
+      "narration": None,
+      "narration_text": "Treat your brain to a nutrient-rich plum, known for improving cognitive function and supporting memory with its natural goodness.",
+      "audio_prompt_url": None,
+      "music": None,
+      "music_volume": 0.25,
+      "duration": None,
+      "text": None,
+      "subtitle": True,
+      "subtitle_config": None,
+      "logo": None
     },
-    
-    # Scene 6: Watermark preset with bottom-right position
     {
       "type": "image",
-      "prompt_image": "A serene forest path with dappled sunlight",
-      "duration": 6,
-      "text": {
-        "content": "© 2024 ProtoReel",
-        "preset": "watermark",
-        "position": "bottom-right"
-      }
+      "image_url": None,
+      "prompt_image": "A visually appealing flat lay of assorted plum dishes, including a plum salad, fresh plum slices, and a bowl of dried prunes, arranged artistically on a pastel-colored tablecloth with botanical motifs.",
+      "prompt_edit_image": None,
+      "image_provider": "gemini",
+      "video_url": None,
+      "prompt_video": None,
+      "video_resolution": "1080p",
+      "video_aspect_ratio": "16:9",
+      "video_duration": "10s",
+      "video_model": "ray-2",
+      "narration": None,
+      "narration_text": "Indulge in the versatile flavors of plums, whether raw, in salads, or as prunes, for a tasty and nutritious addition to your daily diet.",
+      "audio_prompt_url": None,
+      "music": None,
+      "music_volume": 0.25,
+      "duration": None,
+      "text": None,
+      "subtitle": True,
+      "subtitle_config": None,
+      "logo": None
     },
-    
-    # Scene 7: Top-left position with custom styling
     {
-      "type": "image",
-      "prompt_image": "A futuristic city skyline at night",
-      "duration": 6,
-      "text": {
-        "content": "Future City",
-        "position": "top-left",
-        "fontsize": 60,
-        "color": "cyan",
-        "stroke_color": "darkblue",
-        "stroke_width": 2
-      }
-    },
-    
-    # Scene 8: Top-right position with custom styling
-    {
-      "type": "image",
-      "prompt_image": "A cozy coffee shop interior",
-      "duration": 6,
-      "text": {
-        "content": "Coffee Time",
-        "position": "top-right",
-        "fontsize": 50,
-        "color": "brown",
-        "stroke_color": "white",
-        "stroke_width": 1
-      }
-    },
-    
-    # Scene 9: Custom configuration with fade_in animation
-    {
-      "type": "image",
-      "prompt_image": "A starry night sky with aurora borealis",
-      "duration": 6,
-      "text": {
-        "content": "Magical Night",
-        "position": "center",
-        "fontsize": 70,
-        "color": "purple",
-        "stroke_color": "white",
-        "stroke_width": 2,
-        "animation_type": "fade_in"
-      }
-    },
-    
-    # Scene 10: Custom configuration with fade_out animation
-    {
-      "type": "image",
-      "prompt_image": "A sunset over calm ocean waters",
-      "duration": 6,
-      "text": {
-        "content": "Peaceful Sunset",
-        "position": "center",
-        "fontsize": 65,
-        "color": "orange",
-        "stroke_color": "darkred",
-        "stroke_width": 2,
-        "animation_type": "fade_out"
-      }
-    },
-    
-    # Scene 11: Custom configuration with fade_in_out animation
-    {
-      "type": "image",
-      "prompt_image": "A field of blooming sunflowers",
-      "duration": 6,
-      "text": {
-        "content": "Nature's Beauty",
-        "position": "center",
-        "fontsize": 75,
-        "color": "gold",
-        "stroke_color": "darkgreen",
-        "stroke_width": 3,
-        "animation_type": "fade_in_out"
-      }
-    },
-    
-    # Scene 12: Large font size test
-    {
-      "type": "image",
-      "prompt_image": "A dramatic stormy sky with lightning",
-      "duration": 6,
-      "text": {
-        "content": "POWER",
-        "position": "center",
-        "fontsize": 120,
-        "color": "white",
-        "stroke_color": "black",
-        "stroke_width": 4
-      }
-    },
-    
-    # Scene 13: Small font size test
-    {
-      "type": "image",
-      "prompt_image": "A delicate flower garden",
-      "duration": 6,
-      "text": {
-        "content": "Delicate Details",
-        "position": "bottom",
-        "fontsize": 20,
-        "color": "pink",
-        "stroke_color": "white",
-        "stroke_width": 1
-      }
-    },
-    
-    # Scene 14: Multiple colors and stroke combinations
-    {
-      "type": "image",
-      "prompt_image": "A rainbow over rolling hills",
-      "duration": 6,
-      "text": {
-        "content": "Colorful World",
-        "position": "center",
-        "fontsize": 55,
-        "color": "red",
-        "stroke_color": "yellow",
-        "stroke_width": 3
-      }
-    },
-    
-    # Scene 15: No stroke test
-    {
-      "type": "image",
-      "prompt_image": "A minimalist white room with soft lighting",
-      "duration": 6,
-      "text": {
-        "content": "Minimalist Design",
-        "position": "center",
-        "fontsize": 45,
-        "color": "black",
-        "stroke_color": "none",
-        "stroke_width": 0
-      }
+      "type": "video",
+      "image_url": None,
+      "prompt_image": None,
+      "prompt_edit_image": None,
+      "image_provider": "gemini",
+      "video_url": "https://videos.pexels.com/video-files/5865603/5865603-hd_1920_1080_25fps.mp4",
+      "prompt_video": None,
+      "video_resolution": "1080p",
+      "video_aspect_ratio": "16:9",
+      "video_duration": "10s",
+      "video_model": "ray-2",
+      "narration": None,
+      "narration_text": "Make a smart choice for your heart and overall wellness by including plums in your meals, for a delicious and health-conscious lifestyle.",
+      "audio_prompt_url": None,
+      "music": None,
+      "music_volume": 0.25,
+      "duration": None,
+      "text": None,
+      "subtitle": True,
+      "subtitle_config": None,
+      "logo": None
     }
-  ]
+  ],
+  "narration_text": None,
+  "audio_prompt_url": None,
+  "logo": None,
+  "background_music": None,
+  "background_music_volume": 0.3
 }
     create_task(task_id, user_api_key, payload)
     print(f"PYTHONPATH=. python main_worker.py --task-id {task_id}  --api-key {user_api_key}")

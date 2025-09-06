@@ -19,6 +19,7 @@ from video_generator.captacity_integration import generate_captacity_subtitles_c
 from video_generator.cleanup_utils import cleanup_files, upload_to_r2
 from video_generator.logging_utils import get_logger
 from video_generator.config import Config
+from video_generator.background_utils import composite_video_with_blurred_background_safe, cleanup_blurred_background_files
 from pydantic import BaseModel, Field, field_validator
 import time
 
@@ -439,6 +440,18 @@ def render_scene(scene: SceneInput, use_global_narration: bool = False, task_id:
             raise
             
     elif scene.type == "video":
+        # First, determine the target duration based on narration if available
+        target_duration = None
+        if narration_path and not use_global_narration:
+            try:
+                from moviepy import AudioFileClip
+                narration_clip = AudioFileClip(narration_path)
+                target_duration = narration_clip.duration
+                narration_clip.close()  # Close to free memory
+                logger.info(f"Target duration set from narration: {target_duration} seconds", extra={"task_id": task_id})
+            except Exception as e:
+                logger.warning(f"Failed to get narration duration, using scene duration: {e}", extra={"task_id": task_id})
+        
         # Handle video generation from prompt using LumaAI
         if scene.prompt_video:
             try:
@@ -468,9 +481,13 @@ def render_scene(scene: SceneInput, use_global_narration: bool = False, task_id:
                 from moviepy import VideoFileClip
                 video_clip = VideoFileClip(video_path)
                 
-                # Set duration from the generated video
-                duration = video_clip.duration
-                logger.info(f"Video duration: {duration} seconds", extra={"task_id": task_id})
+                # Set duration based on target duration or video duration
+                if target_duration:
+                    duration = target_duration
+                    logger.info(f"Using narration duration: {duration} seconds", extra={"task_id": task_id})
+                else:
+                    duration = video_clip.duration
+                    logger.info(f"Using video duration: {duration} seconds", extra={"task_id": task_id})
                 
             except Exception as e:
                 logger.error(f"Video generation failed: {e}", exc_info=True, extra={"task_id": task_id})
@@ -486,8 +503,13 @@ def render_scene(scene: SceneInput, use_global_narration: bool = False, task_id:
                 # Create video clip from downloaded video
                 from moviepy import VideoFileClip
                 video_clip = VideoFileClip(video_path)
-                duration = scene.duration or video_clip.duration
-                logger.info(f"Video duration: {duration} seconds", extra={"task_id": task_id})
+                # Set duration based on target duration or scene/video duration
+                if target_duration:
+                    duration = target_duration
+                    logger.info(f"Using narration duration: {duration} seconds", extra={"task_id": task_id})
+                else:
+                    duration = scene.duration or video_clip.duration
+                    logger.info(f"Using scene/video duration: {duration} seconds", extra={"task_id": task_id})
                 
             except Exception as e:
                 logger.error(f"Failed to download video asset: {e}", exc_info=True, extra={"task_id": task_id})
@@ -496,14 +518,56 @@ def render_scene(scene: SceneInput, use_global_narration: bool = False, task_id:
             logger.error("Video prompt or video URL required for video scene.", extra={"task_id": task_id})
             raise ValueError("Video prompt or video URL required for video scene.")
             
-        # Resize video to match REEL_SIZE
+        # Resize video to match REEL_SIZE with blurred background if needed
         try:
-            video_clip = video_clip.resized(height=REEL_SIZE[1])
-            if video_clip.w > REEL_SIZE[0]:
-                video_clip = video_clip.resized(width=REEL_SIZE[0])
+            logger.info(f"Processing video clip: original size {video_clip.w}x{video_clip.h}, target size {REEL_SIZE[0]}x{REEL_SIZE[1]}", extra={"task_id": task_id})
+            
+            # Validate video clip before processing
+            if video_clip.w <= 0 or video_clip.h <= 0:
+                logger.error(f"Invalid video dimensions: {video_clip.w}x{video_clip.h}", extra={"task_id": task_id})
+                raise ValueError(f"Invalid video dimensions: {video_clip.w}x{video_clip.h}")
+            
+            # Use safe blurred background compositing to avoid mask issues
+            video_clip = composite_video_with_blurred_background_safe(
+                video_clip, 
+                REEL_SIZE, 
+                blur_radius=20,  # Moderate blur
+                background_opacity=0.3,  # Subtle background
+                task_id=task_id
+            )
+            
+            logger.info(f"Video processed with blurred background: final size {video_clip.w}x{video_clip.h}", extra={"task_id": task_id})
+            
         except Exception as e:
-            logger.error(f"Failed to resize video clip: {e}", exc_info=True, extra={"task_id": task_id})
-            raise
+            logger.error(f"Failed to process video clip with blurred background: {e}", exc_info=True, extra={"task_id": task_id})
+            # Fallback to simple resizing if blurred background fails
+            try:
+                logger.warning("Falling back to simple video resizing", extra={"task_id": task_id})
+                # Ensure we have a valid video clip for fallback
+                if video_clip.w > 0 and video_clip.h > 0:
+                    video_clip = video_clip.resized(height=REEL_SIZE[1])
+                    if video_clip.w > REEL_SIZE[0]:
+                        video_clip = video_clip.resized(width=REEL_SIZE[0])
+                else:
+                    logger.error("Video clip has invalid dimensions, cannot proceed", extra={"task_id": task_id})
+                    raise ValueError("Video clip has invalid dimensions")
+            except Exception as fallback_e:
+                logger.error(f"Fallback resizing also failed: {fallback_e}", exc_info=True, extra={"task_id": task_id})
+                raise
+        
+        # Handle video duration adjustment based on target duration
+        if target_duration and target_duration > video_clip.duration:
+            logger.info(f"Narration longer than video ({target_duration}s > {video_clip.duration}s), looping video", extra={"task_id": task_id})
+            # Calculate how many loops we need
+            loops_needed = int(target_duration / video_clip.duration) + 1
+            video_clips = [video_clip] * loops_needed
+            video_clip = concatenate_videoclips(video_clips)
+            # Trim to exact target duration
+            video_clip = video_clip.subclipped(0, target_duration)
+            logger.info(f"Video looped {loops_needed} times to cover narration duration", extra={"task_id": task_id})
+        elif target_duration and target_duration < video_clip.duration:
+            logger.info(f"Narration shorter than video ({target_duration}s < {video_clip.duration}s), trimming video", extra={"task_id": task_id})
+            video_clip = video_clip.subclipped(0, target_duration)
             
     else:
         logger.error(f"Unsupported scene type: {scene.type}", extra={"task_id": task_id})
@@ -526,26 +590,14 @@ def render_scene(scene: SceneInput, use_global_narration: bool = False, task_id:
                     narration_padded = narration_padded.with_duration(video_clip.duration)
                     logger.info(f"Narration padded with silence: {narration_clip.duration}s -> {video_clip.duration}s", extra={"task_id": task_id})
                 else:
-                    # Narration is longer - extend video duration to match narration
+                    # Narration is longer - extend video duration to match narration (for image scenes)
                     extended_duration = narration_clip.duration
                     logger.info(f"Narration longer than video: extending video from {video_clip.duration}s to {extended_duration}s", extra={"task_id": task_id})
                     
-                    # Extend video by looping or freezing the last frame
+                    # For image scenes, extend the duration
                     if scene.type == "image":
-                        # For images, just extend the duration
                         video_clip = video_clip.with_duration(extended_duration)
-                    elif scene.type == "video":
-                        # For videos, loop the video to cover the narration duration
-                        if extended_duration > video_clip.duration * 2:
-                            # If narration is much longer, loop the video
-                            loops_needed = int(extended_duration / video_clip.duration) + 1
-                            video_clips = [video_clip] * loops_needed
-                            video_clip = concatenate_videoclips(video_clips)
-                            video_clip = video_clip.subclipped(0, extended_duration)
-                            logger.info(f"Video looped {loops_needed} times to cover narration duration", extra={"task_id": task_id})
-                        else:
-                            # If narration is only slightly longer, just extend the last frame
-                            video_clip = video_clip.with_duration(extended_duration)
+                    # For video scenes, we already handled looping above
                     
                     # Use the full narration duration
                     narration_padded = narration_clip
@@ -1025,6 +1077,7 @@ def generate_video_core(request_dict, task_id=None):
                 
                 # Clean up temporary files
                 cleanup_files(temp_files + scene_files)
+                cleanup_blurred_background_files()
                 
                 return {
                     "r2_url": r2_url,
@@ -1041,6 +1094,7 @@ def generate_video_core(request_dict, task_id=None):
             logger.error(f"Video generation failed: {e}", exc_info=True, extra={"task_id": task_id})
             # Clean up on failure
             cleanup_files(temp_files + scene_files)
+            cleanup_blurred_background_files()
             raise
     
     return _generate_video_internal()
