@@ -251,6 +251,7 @@ def composite_video_with_blurred_background_safe(
     target_size: Tuple[int, int],
     blur_radius: int = 20,
     background_opacity: float = 0.3,
+    max_zoom_factor: float = 2.5,  # Maximum zoom factor before using blurred background
     task_id: Optional[str] = None
 ) -> VideoFileClip:
     """
@@ -289,6 +290,16 @@ def composite_video_with_blurred_background_safe(
         
         # Use the larger scale to fill the entire frame
         fill_scale = max(scale_w, scale_h)
+        
+        # Check if zoom factor is too high - use blurred background instead
+        if fill_scale > max_zoom_factor:
+            logger.info(f"Zoom factor {fill_scale:.2f} exceeds maximum {max_zoom_factor}, using blurred background instead", 
+                       extra={"task_id": task_id} if task_id else None)
+            
+            # Use blurred background approach for very small videos
+            return _create_blurred_background_video(
+                video_clip, target_size, blur_radius, background_opacity, task_id
+            )
         
         # Resize video to fill the entire target size
         fill_w = int(video_clip.w * fill_scale)
@@ -368,6 +379,97 @@ def composite_video_with_blurred_background_safe(
         
     except Exception as e:
         logger.error(f"Safe video processing failed: {e}", exc_info=True, 
+                    extra={"task_id": task_id} if task_id else None)
+        raise
+
+def _create_blurred_background_video(
+    video_clip: VideoFileClip,
+    target_size: Tuple[int, int],
+    blur_radius: int = 20,
+    background_opacity: float = 0.3,
+    task_id: Optional[str] = None
+) -> VideoFileClip:
+    """
+    Create a video with blurred background for very small videos.
+    This avoids excessive zooming by using a blurred background.
+    
+    Args:
+        video_clip: Source video clip
+        target_size: Target size as (width, height)
+        blur_radius: Blur radius for the background
+        background_opacity: Opacity of the background
+        task_id: Task ID for logging
+        
+    Returns:
+        VideoFileClip with blurred background
+    """
+    try:
+        logger.info(f"Creating blurred background video for small source: {video_clip.w}x{video_clip.h}", 
+                   extra={"task_id": task_id} if task_id else None)
+        
+        # Create blurred background
+        background_clip = create_blurred_background_from_video(
+            video_clip, target_size, blur_radius, background_opacity, task_id
+        )
+        
+        # Resize video to reasonable size (not too small, not too big)
+        # Use a moderate scale that maintains quality
+        moderate_scale = min(target_size[0] / video_clip.w, target_size[1] / video_clip.h) * 0.7  # 70% of available space
+        
+        moderate_w = int(video_clip.w * moderate_scale)
+        moderate_h = int(video_clip.h * moderate_scale)
+        
+        # Ensure minimum size
+        moderate_w = max(moderate_w, 200)
+        moderate_h = max(moderate_h, 200)
+        
+        logger.info(f"Resizing video to moderate size: {moderate_w}x{moderate_h}", 
+                   extra={"task_id": task_id} if task_id else None)
+        
+        # Resize video to moderate size
+        resized_video = video_clip.resized((moderate_w, moderate_h))
+        
+        # Center the video
+        x = (target_size[0] - moderate_w) // 2
+        y = (target_size[1] - moderate_h) // 2
+        resized_video = resized_video.with_position((x, y))
+        
+        # Validate dimensions
+        if resized_video.w <= 0 or resized_video.h <= 0:
+            logger.error(f"Resized video has invalid dimensions: {resized_video.w}x{resized_video.h}", 
+                       extra={"task_id": task_id} if task_id else None)
+            raise ValueError(f"Resized video has invalid dimensions: {resized_video.w}x{resized_video.h}")
+        
+        # Composite background and video
+        try:
+            composite_clip = CompositeVideoClip([background_clip, resized_video])
+            
+            # Validate composite clip dimensions
+            if composite_clip.w <= 0 or composite_clip.h <= 0:
+                logger.error(f"Composite clip has invalid dimensions: {composite_clip.w}x{composite_clip.h}", 
+                           extra={"task_id": task_id} if task_id else None)
+                raise ValueError(f"Composite clip has invalid dimensions: {composite_clip.w}x{composite_clip.h}")
+            
+            # Ensure composite clip has proper size
+            if composite_clip.w != target_size[0] or composite_clip.h != target_size[1]:
+                logger.warning(f"Composite clip size mismatch: {composite_clip.w}x{composite_clip.h} != {target_size[0]}x{target_size[1]}", 
+                             extra={"task_id": task_id} if task_id else None)
+                # Force resize to exact target size
+                composite_clip = composite_clip.resized(target_size)
+            
+            logger.info(f"Blurred background video created: {moderate_w}x{moderate_h} at position ({x}, {y})", 
+                       extra={"task_id": task_id} if task_id else None)
+            
+            return composite_clip
+            
+        except Exception as composite_error:
+            logger.warning(f"CompositeVideoClip failed: {composite_error}, falling back to simple resize", 
+                         extra={"task_id": task_id} if task_id else None)
+            # Fallback: just resize to target size
+            return video_clip.resized(target_size)
+        
+    except Exception as e:
+        logger.error(f"Failed to create blurred background video: {e}", exc_info=True, 
                     extra={"task_id": task_id} if task_id else None)
         raise
 

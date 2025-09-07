@@ -221,6 +221,7 @@ def edit_image_with_prompt(image_url: str, prompt: str, task_id: Optional[str] =
         raise RuntimeError(f"Image editing failed: {e}")
 
 class SceneInput(BaseModel):
+    scene_id: Optional[str] = None  # Unique identifier for scene tracking
     type: str
     image_url: Optional[str] = None
     prompt_image: Optional[str] = None
@@ -262,6 +263,60 @@ class SceneInput(BaseModel):
         - Uses Gemini AI to edit the image based on the prompt
     """
 
+def generate_scene_id(scene: dict, scene_idx: int, task_id: Optional[str] = None) -> str:
+    """
+    Generate a unique scene_id for tracking purposes.
+    If scene_id is already provided, use it. Otherwise, generate one automatically.
+    
+    Args:
+        scene: Scene dictionary from payload
+        scene_idx: Index of the scene (0-based)
+        task_id: Task ID for logging
+        
+    Returns:
+        Unique scene_id string
+    """
+    # If scene_id is already provided, use it
+    if scene.get("scene_id"):
+        logger.info(f"Using provided scene_id: {scene['scene_id']}", extra={"task_id": task_id})
+        return scene["scene_id"]
+    
+    # Generate automatic scene_id based on scene content and index
+    scene_type = scene.get("type", "unknown")
+    scene_content = ""
+    
+    # Try to create meaningful identifier from scene content
+    if scene.get("prompt_image"):
+        # Use first few words of image prompt
+        scene_content = scene["prompt_image"][:30].replace(" ", "_").lower()
+    elif scene.get("prompt_video"):
+        # Use first few words of video prompt
+        scene_content = scene["prompt_video"][:30].replace(" ", "_").lower()
+    elif scene.get("image_url"):
+        # Use filename from URL
+        import os
+        scene_content = os.path.basename(scene["image_url"]).split(".")[0]
+    elif scene.get("video_url"):
+        # Use filename from URL
+        import os
+        scene_content = os.path.basename(scene["video_url"]).split(".")[0]
+    elif scene.get("narration_text"):
+        # Use first few words of narration
+        scene_content = scene["narration_text"][:20].replace(" ", "_").lower()
+    
+    # Clean up content (remove special characters)
+    import re
+    scene_content = re.sub(r'[^a-zA-Z0-9_-]', '', scene_content)
+    
+    # Generate scene_id
+    if scene_content:
+        scene_id = f"{scene_type}_{scene_idx+1}_{scene_content}"
+    else:
+        scene_id = f"{scene_type}_{scene_idx+1}"
+    
+    logger.info(f"Generated scene_id: {scene_id}", extra={"task_id": task_id})
+    return scene_id
+
 def render_scene(scene: SceneInput, use_global_narration: bool = False, task_id: Optional[str] = None, 
                 scene_context: dict = None, video_context: dict = None, audio_prompt_url: Optional[str] = None,
                 global_subtitle_config: dict = None) -> (str, List[str]):
@@ -278,7 +333,8 @@ def render_scene(scene: SceneInput, use_global_narration: bool = False, task_id:
         audio_prompt_url: Audio prompt URL to use as fallback if scene doesn't have one
         global_subtitle_config: Global subtitle configuration to use as fallback
     """
-    logger.info(f"Rendering scene: {scene}", extra={"task_id": task_id})
+    scene_id = getattr(scene, 'scene_id', 'unknown')
+    logger.info(f"Rendering scene [{scene_id}]: {scene}", extra={"task_id": task_id})
     temp_files = []
     video_clip = None
     audio_clips = []
@@ -343,10 +399,10 @@ def render_scene(scene: SceneInput, use_global_narration: bool = False, task_id:
         image_path = None
         if scene.image_url:
             try:
-                logger.info(f"Downloading image asset: {scene.image_url}", extra={"task_id": task_id})
+                logger.info(f"[{scene_id}] Downloading image asset: {scene.image_url}", extra={"task_id": task_id})
                 image_path = download_asset(scene.image_url)
                 temp_files.append(image_path)
-                logger.info(f"Added image from file: {image_path}", extra={"task_id": task_id})
+                logger.info(f"[{scene_id}] Added image from file: {image_path}", extra={"task_id": task_id})
             except Exception as e:
                 logger.error(f"Failed to download image asset: {e}", exc_info=True, extra={"task_id": task_id})
                 raise
@@ -372,7 +428,7 @@ def render_scene(scene: SceneInput, use_global_narration: bool = False, task_id:
             
             out_path = os.path.join(tempfile.gettempdir(), f"generated_{uuid.uuid4().hex}.png")
             try:
-                logger.info(f"Generating image from prompt using {provider}: {scene.prompt_image}", extra={"task_id": task_id})
+                logger.info(f"[{scene_id}] Generating image from prompt using {provider}: {scene.prompt_image}", extra={"task_id": task_id})
                 image_path = generate_image_from_prompt(scene.prompt_image, api_key, out_path, provider=provider, scene_context=scene_context, video_context=video_context)
                 temp_files.append(image_path)
                 logger.info(f"Generated image from prompt: {image_path}", extra={"task_id": task_id})
@@ -533,6 +589,7 @@ def render_scene(scene: SceneInput, use_global_narration: bool = False, task_id:
                 REEL_SIZE, 
                 blur_radius=20,  # Moderate blur
                 background_opacity=0.3,  # Subtle background
+                max_zoom_factor=2.5,  # Maximum zoom before using blurred background
                 task_id=task_id
             )
             
@@ -1203,6 +1260,10 @@ def process_scene_sequential(scene, scene_idx, use_global_narration, global_audi
             else:
                 scene["duration"] = 10  # Fallback to 10 seconds if no narration
                 logger.info(f"No narration duration available, set default duration: {scene['duration']} seconds", extra={"task_id": task_id})
+        
+        # Generate scene_id if not provided
+        if not scene.get("scene_id"):
+            scene["scene_id"] = generate_scene_id(scene, scene_idx, task_id)
         
         scene_file, files_to_clean = render_scene(SceneInput(**scene), use_global_narration=use_global_narration, 
                                                  task_id=task_id, scene_context=scene_context, video_context=video_context,

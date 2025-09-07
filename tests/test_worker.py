@@ -23,153 +23,41 @@ def test_worker_job_mode():
     task_id = str(uuid.uuid4())
     user_api_key = "78c33510dbea4817910ec221c48191c1"
     payload = {
-  "output_filename": "plum_health_benefits.mp4",
+  "output_filename": "trading_meme_video.mp4",
   "scenes": [
     {
-      "type": "video",
-      "image_url": None,
-      "prompt_image": None,
-      "prompt_edit_image": None,
-      "image_provider": "gemini",
-      "video_url": "https://videos.pexels.com/video-files/8802370/8802370-sd_360_640_30fps.mp4",
-      "prompt_video": None,
-      "video_resolution": "1080p",
-      "video_aspect_ratio": "16:9",
-      "video_duration": "10s",
-      "video_model": "ray-2",
-      "narration": None,
-      "narration_text": "Start your day with a juicy plum, bursting with antioxidants and vitamins to boost heart health and immunity.",
-      "audio_prompt_url": None,
-      "music": None,
-      "music_volume": 0.25,
-      "duration": None,
-      "text": None,
-      "subtitle": True,
-      "subtitle_config": None,
-      "logo": None
+      "type": "image",
+      "narration_text": "Most beginner traders fall for this trap within their first month…",
+      "prompt_image": "A wide-angle, high-contrast image of a stressed-out young trader looking at multiple monitors showing red candlestick charts, with text overlay: 'Don't Be This Guy 🧨'",
+      "subtitle": False
     },
     {
       "type": "image",
-      "image_url": None,
-      "prompt_image": "A colorful fruit salad bowl featuring sliced plums, strawberries, and kiwi, sprinkled with chia seeds and drizzled with honey, presented on a white background with a modern aesthetic.",
-      "prompt_edit_image": None,
-      "image_provider": "gemini",
-      "video_url": None,
-      "prompt_video": None,
-      "video_resolution": "1080p",
-      "video_aspect_ratio": "16:9",
-      "video_duration": "10s",
-      "video_model": "ray-2",
-      "narration": None,
-      "narration_text": "Plums are a powerhouse of nutrients like vitamin C, potassium, and fiber, essential for overall well-being and weight management.",
-      "audio_prompt_url": None,
-      "music": None,
-      "music_volume": 0.25,
-      "duration": None,
-      "text": None,
-      "subtitle": True, 
-      "subtitle_config": None,
-      "logo": None
-    },
-    {
-      "type": "video",
-      "image_url": None,
-      "prompt_image": None,
-      "prompt_edit_image": None,
-      "image_provider": "gemini",
-      "video_url": "https://videos.pexels.com/video-files/3021947/3021947-hd_1920_1080_30fps.mp4",
-      "prompt_video": None,
-      "video_resolution": "1080p",
-      "video_aspect_ratio": "16:9",
-      "video_duration": "10s",
-      "video_model": "ray-2",
-      "narration": None,
-      "narration_text": "Discover the bone-strengthening benefits of plums with a delicious prune snack, rich in polyphenols and vitamin K for optimal health.",
-      "audio_prompt_url": None,
-      "music": None,
-      "music_volume": 0.25,
-      "duration": None,
-      "text": None,
-      "subtitle": True,
-      "subtitle_config": None,
-      "logo": None
+      "narration_text": "Chasing green candles without strategy? It’s the quickest way to blow your account.",
+      "prompt_image": "Top-down photo of a desk with crumpled notes, empty coffee cups, and a stock chart open on a tablet with price crashing. Dim lighting and chaotic vibes.",
+      "subtitle": True
     },
     {
       "type": "image",
-      "image_url": None,
-      "prompt_image": "A serene shot of a person holding a plum while reading a book in a cozy library setting, with warm ambient lighting and a stack of books in the background, creating a peaceful atmosphere.",
-      "prompt_edit_image": None,
-      "image_provider": "gemini",
-      "video_url": None,
-      "prompt_video": None,
-      "video_resolution": "1080p",
-      "video_aspect_ratio": "16:9",
-      "video_duration": "10s",
-      "video_model": "ray-2",
-      "narration": None,
-      "narration_text": "Treat your brain to a nutrient-rich plum, known for improving cognitive function and supporting memory with its natural goodness.",
-      "audio_prompt_url": None,
-      "music": None,
-      "music_volume": 0.25,
-      "duration": None,
-      "text": None,
-      "subtitle": True,
-      "subtitle_config": None,
-      "logo": None
+      "narration_text": "Here’s the strategy pros use — risk 1%, win 3x. No more gambling.",
+      "prompt_image": "Clean, minimal scene showing a planner notebook open to a 'Risk Management Plan' with neat graphs and a hand pointing to a win-rate formula.",
+      "subtitle": True
     },
     {
       "type": "image",
-      "image_url": None,
-      "prompt_image": "A visually appealing flat lay of assorted plum dishes, including a plum salad, fresh plum slices, and a bowl of dried prunes, arranged artistically on a pastel-colored tablecloth with botanical motifs.",
-      "prompt_edit_image": None,
-      "image_provider": "gemini",
-      "video_url": None,
-      "prompt_video": None,
-      "video_resolution": "1080p",
-      "video_aspect_ratio": "16:9",
-      "video_duration": "10s",
-      "video_model": "ray-2",
-      "narration": None,
-      "narration_text": "Indulge in the versatile flavors of plums, whether raw, in salads, or as prunes, for a tasty and nutritious addition to your daily diet.",
-      "audio_prompt_url": None,
-      "music": None,
-      "music_volume": 0.25,
-      "duration": None,
-      "text": None,
-      "subtitle": True,
-      "subtitle_config": None,
-      "logo": None
+      "narration_text": "Consistency is the game. One good trade a day beats 10 reckless ones.",
+      "prompt_image": "Ultra-sharp macro shot of a person sipping tea while watching a trading monitor calmly, with a zen garden in the background.",
+      "subtitle": True
     },
     {
-      "type": "video",
-      "image_url": None,
-      "prompt_image": None,
-      "prompt_edit_image": None,
-      "image_provider": "gemini",
-      "video_url": "https://videos.pexels.com/video-files/5865603/5865603-hd_1920_1080_25fps.mp4",
-      "prompt_video": None,
-      "video_resolution": "1080p",
-      "video_aspect_ratio": "16:9",
-      "video_duration": "10s",
-      "video_model": "ray-2",
-      "narration": None,
-      "narration_text": "Make a smart choice for your heart and overall wellness by including plums in your meals, for a delicious and health-conscious lifestyle.",
-      "audio_prompt_url": None,
-      "music": None,
-      "music_volume": 0.25,
-      "duration": None,
-      "text": None,
-      "subtitle": True,
-      "subtitle_config": None,
-      "logo": None
+      "type": "image",
+      "narration_text": "Ready to grow your trading with smarter content?",
+      "prompt_image": "A closing shot of a stylized 'Follow for More' animation on a phone screen with a trading setup in the background, and bright neon callout: 'JOIN THE MOVEMENT 🚀'",
+      "subtitle": False
     }
-  ],
-  "narration_text": None,
-  "audio_prompt_url": None,
-  "logo": None,
-  "background_music": None,
-  "background_music_volume": 0.3
+  ]
 }
+
     create_task(task_id, user_api_key, payload)
     print(f"PYTHONPATH=. python main_worker.py --task-id {task_id}  --api-key {user_api_key}")
 
@@ -203,44 +91,39 @@ def test_worker_process_task():
     # task_id = str(uuid.uuid4())
     task_id= "7003c133-9b50-40f8-90a9-c3be2be60848"
     payload = {
-    "task_id": "7003c133-9b50-40f8-90a9-c3be2be60848",
-    "request_dict": {
-        "output_filename": "test_worker_video2.mp4",
-        "scenes": [
-            {
-                "type": "image",
-                "narration_text": "In a monumental announcement, President Donald Trump has revealed a massive trade deal with Japan, calling it the 'largest deal in history with Japan.' This landmark agreement promises to reshape global economic partnerships.",
-                "prompt_image": "A photo-realistic image of President holding a press conference with the flags of the United States and Japan in the background, emphasizing a momentous announcement.",
-                "image_provider": "gemini",
-                "subtitle": True,
-                "animation_preset": "energetic",
-                "animation_darken_factor": 0.3,
-                "animation_drift_px": 65,
-                "animation_osc_px": 40
-            },
-            # {
-            #     "type": "image",
-            #     "narration_text": "The deal includes a staggering $550 billion investment from Japan into the United States. This infusion of funds is expected to boost various sectors and create numerous jobs, potentially strengthening ties between the two nations.",
-            #     "prompt_image": "A photo-realistic image of a bustling New York City skyline with symbolic dollar signs and yen symbols overlayed, representing financial investment.",
-            #     "image_provider": "gemini",
-            #     "subtitle": True
-            # },
-            # {
-            #     "type": "image",
-            #     "narration_text": "Both countries will implement a 15% tariff on each other's goods, including crucial sectors such as vehicles and agricultural products. While this aims to level the playing field, experts warn to carefully evaluate its long-term benefits.",
-            #     "prompt_image": "A photo-realistic image of shipping containers at a busy port with agricultural products and cars visible, representing international trade and tariffs.",
-            #     "image_provider": "gemini",
-            #     "subtitle": True
-            # },
-            # {
-            #     "type": "image",
-            #     "narration_text": "As full details of the agreement are still unfolding, stay tuned for updates. Follow the hashtags #USJapanDeal and #TrumpTradeDeal for the latest news. Experts continue to analyze the potential impacts on global business dynamics.",
-            #     "prompt_image": "A photo-realistic image of a group of analysts in an office with a world map and international news screens visible, symbolizing ongoing discussions and evaluations.",
-            #     "image_provider": "gemini",
-            #     "subtitle": True
-            # }
-        ]
+  "output_filename": "trading_meme_video.mp4",
+  "scenes": [
+    {
+      "type": "image",
+      "narration_text": "Most beginner traders fall for this trap within their first month…",
+      "prompt_image": "A wide-angle, high-contrast image of a stressed-out young trader looking at multiple monitors showing red candlestick charts, with text overlay: 'Don't Be This Guy 🧨'",
+      "subtitle": False
+    },
+    {
+      "type": "image",
+      "narration_text": "Chasing green candles without strategy? It’s the quickest way to blow your account.",
+      "prompt_image": "Top-down photo of a desk with crumpled notes, empty coffee cups, and a stock chart open on a tablet with price crashing. Dim lighting and chaotic vibes.",
+      "subtitle": True
+    },
+    {
+      "type": "image",
+      "narration_text": "Here’s the strategy pros use — risk 1%, win 3x. No more gambling.",
+      "prompt_image": "Clean, minimal scene showing a planner notebook open to a 'Risk Management Plan' with neat graphs and a hand pointing to a win-rate formula.",
+      "subtitle": True
+    },
+    {
+      "type": "image",
+      "narration_text": "Consistency is the game. One good trade a day beats 10 reckless ones.",
+      "prompt_image": "Ultra-sharp macro shot of a person sipping tea while watching a trading monitor calmly, with a zen garden in the background.",
+      "subtitle": True
+    },
+    {
+      "type": "image",
+      "narration_text": "Ready to grow your trading with smarter content?",
+      "prompt_image": "A closing shot of a stylized 'Follow for More' animation on a phone screen with a trading setup in the background, and bright neon callout: 'JOIN THE MOVEMENT 🚀'",
+      "subtitle": False
     }
+  ]
 }
     response = requests.post(WORKER_URL, json=payload)
     assert response.status_code == 200, f"Worker returned status {response.status_code}: {response.text}"

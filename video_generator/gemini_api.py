@@ -3,6 +3,8 @@ Gemini API integration for image generation using google-genai.
 """
 import os
 import logging
+import time
+import random
 from PIL import Image
 from io import BytesIO
 import google.genai as genai
@@ -14,7 +16,7 @@ logger = logging.getLogger(__name__)
 def generate_image_from_prompt_gemini(prompt: str, out_path: str, model: str = "gemini-2.5-flash-image-preview", 
                                     scene_context: dict = None, video_context: dict = None) -> str:
     """
-    Generate an image from a text prompt using Google Gemini and save to out_path.
+    Generate an image from a text prompt using Google Gemini with retry logic.
     Enhanced with contextual information for better scene coherence.
     
     Args:
@@ -23,37 +25,91 @@ def generate_image_from_prompt_gemini(prompt: str, out_path: str, model: str = "
         model: Gemini model to use
         scene_context: Additional context about the scene (scene_index, total_scenes, etc.)
         video_context: Context about the entire video (theme, narration_text, etc.)
+        
+    Returns:
+        Path to the generated image file
+        
+    Raises:
+        RuntimeError: If image generation fails after all retries
     """
-    try:
-        client = genai.Client(api_key=os.environ["GEMENI_API_KEY"])
-        
-        # Build enhanced prompt with context
-        enhanced_prompt = build_enhanced_prompt(prompt, scene_context, video_context)
-        
-        response = client.models.generate_content(
-            model=model,
-            contents=enhanced_prompt,
-            config=types.GenerateContentConfig(
-                response_modalities=['TEXT', 'IMAGE'],
+    # Check API key (fix typo)
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        raise RuntimeError("GEMINI_API_KEY environment variable not set")
+    
+    max_retries = 3
+    base_delay = 1.0
+    
+    for attempt in range(max_retries):
+        try:
+            logger.info(f"Gemini API attempt {attempt + 1}/{max_retries} for prompt: {prompt[:50]}...")
+            
+            client = genai.Client(api_key=api_key)
+            
+            # Build enhanced prompt with context
+            enhanced_prompt = build_enhanced_prompt(prompt, scene_context, video_context)
+            
+            response = client.models.generate_content(
+                model=model,
+                contents=enhanced_prompt,
+                config=types.GenerateContentConfig(
+                    response_modalities=['TEXT', 'IMAGE'],
+                )
             )
-        )
-        found_image = False
-        for part in response.candidates[0].content.parts:
-            if getattr(part, 'text', None) is not None:
-                logger.info(f"Gemini text response: {part.text}")
-            elif getattr(part, 'inline_data', None) is not None:
-                image = Image.open(BytesIO(part.inline_data.data))
-                # Resize to REEL_SIZE
-                image = image.resize(Config.REEL_SIZE, Image.LANCZOS)
-                image.save(out_path)
-                logger.info(f"Gemini image saved to {out_path}")
-                found_image = True
-        if not found_image:
-            raise RuntimeError("No image found in Gemini response.")
-        return out_path
-    except Exception as e:
-        logger.error(f"Gemini image generation failed: {e}")
-        raise RuntimeError(f"Gemini image generation failed: {e}")
+            
+            found_image = False
+            for part in response.candidates[0].content.parts:
+                if getattr(part, 'text', None) is not None:
+                    logger.info(f"Gemini text response: {part.text}")
+                elif getattr(part, 'inline_data', None) is not None:
+                    image = Image.open(BytesIO(part.inline_data.data))
+                    # Resize to REEL_SIZE
+                    image = image.resize(Config.REEL_SIZE, Image.LANCZOS)
+                    image.save(out_path)
+                    logger.info(f"Gemini image saved to {out_path}")
+                    found_image = True
+            
+            if not found_image:
+                raise RuntimeError("No image found in Gemini response.")
+            
+            return out_path
+            
+        except Exception as e:
+            error_msg = str(e)
+            logger.warning(f"Gemini API attempt {attempt + 1} failed: {error_msg}")
+            
+            # Check if it's a retryable error
+            retryable_errors = [
+                'server disconnected without sending a response',
+                'connection reset',
+                'timeout',
+                'network',
+                'connection',
+                'disconnected',
+                'remote protocol error',
+                'httpx.remoteprotocolerror',
+                'httpcore.remoteprotocolerror'
+            ]
+            
+            is_retryable = any(keyword in error_msg.lower() for keyword in retryable_errors)
+            
+            if is_retryable and attempt < max_retries - 1:
+                # Exponential backoff with jitter
+                delay = base_delay * (2 ** attempt) + random.uniform(0, 1)
+                logger.info(f"Retryable error detected. Retrying in {delay:.2f} seconds...")
+                time.sleep(delay)
+                continue
+            else:
+                if attempt == max_retries - 1:
+                    logger.error(f"Gemini API failed after {max_retries} attempts: {error_msg}")
+                    raise RuntimeError(f"Gemini image generation failed after {max_retries} attempts: {error_msg}")
+                else:
+                    # Non-retryable error, fail immediately
+                    logger.error(f"Gemini API error (non-retryable): {error_msg}")
+                    raise RuntimeError(f"Gemini image generation failed: {error_msg}")
+    
+    # This should never be reached, but just in case
+    raise RuntimeError(f"Gemini image generation failed after {max_retries} attempts")
 
 def build_enhanced_prompt(base_prompt: str, scene_context: dict = None, video_context: dict = None) -> str:
     """

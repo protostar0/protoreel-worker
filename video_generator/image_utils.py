@@ -85,15 +85,48 @@ def generate_image_from_prompt(prompt: str, api_key: str, out_path: str, provide
     def _generate_image_internal():
         logger.info(f"Generating image with {provider} API. Prompt: {prompt[:50]}...")
         
-        if provider.lower() == "freepik":
-            return generate_image_from_prompt_freepik(prompt, api_key, out_path)
+        # Define fallback providers in order of preference
+        fallback_providers = []
+        if provider.lower() == "gemini":
+            fallback_providers = ["openai", "freepik"]
         elif provider.lower() == "openai":
-            return _generate_image_from_prompt(prompt, api_key, out_path)
-        elif provider.lower() == "gemini":
-            return generate_image_from_prompt_gemini(prompt, out_path, 
-                                                   scene_context=scene_context, 
-                                                   video_context=video_context)
-        else:
-            raise ValueError(f"Unsupported image generation provider: {provider}. Supported providers: openai, freepik, gemini")
+            fallback_providers = ["gemini", "freepik"]
+        elif provider.lower() == "freepik":
+            fallback_providers = ["openai", "gemini"]
+        
+        # Try primary provider first
+        providers_to_try = [provider.lower()] + fallback_providers
+        
+        last_error = None
+        for attempt_provider in providers_to_try:
+            try:
+                logger.info(f"Attempting image generation with {attempt_provider} API")
+                
+                if attempt_provider == "freepik":
+                    return generate_image_from_prompt_freepik(prompt, api_key, out_path)
+                elif attempt_provider == "openai":
+                    return _generate_image_from_prompt(prompt, api_key, out_path)
+                elif attempt_provider == "gemini":
+                    return generate_image_from_prompt_gemini(prompt, out_path, 
+                                                           scene_context=scene_context, 
+                                                           video_context=video_context)
+                else:
+                    raise ValueError(f"Unsupported image generation provider: {attempt_provider}")
+                    
+            except Exception as e:
+                last_error = e
+                logger.warning(f"Image generation failed with {attempt_provider}: {e}")
+                
+                # If this is not the last provider, try the next one
+                if attempt_provider != providers_to_try[-1]:
+                    logger.info(f"Falling back to next provider...")
+                    continue
+                else:
+                    # This was the last provider, raise the error
+                    logger.error(f"All image generation providers failed. Last error: {e}")
+                    raise RuntimeError(f"Image generation failed with all providers. Last error: {e}")
+        
+        # This should never be reached, but just in case
+        raise RuntimeError(f"Image generation failed: {last_error}")
     
     return _generate_image_internal() 
