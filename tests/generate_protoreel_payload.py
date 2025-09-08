@@ -125,19 +125,65 @@ class PayloadGenerator:
         else:
             scene_count_instruction = "- Create 3 to 5 scenes (default)."
         
-        prompt = f"""You are a social media marketing specialist. Create a script for a social media video based on the topic below.
-The video must be structured into scenes, with a total length between 30 to 50 seconds.
+        prompt = f"""You are a senior social media marketing expert. Create a script for a vertical video designed for platforms like Instagram Reels, TikTok, or YouTube Shorts.
+
+The video must be structured into scenes, totaling **30 to 50 seconds** of runtime.
+
 {scene_count_instruction}
-- If the user specifies more than 6 scenes, create only 6 scenes maximum.
-Each scene should include the following:
-1. Image prompt (prompt_image): A highly detailed, photo-realistic image description written in English. It must avoid any content related to violence, sexual content, hate, self-harm, illegal activity, sensitive political material, or graphic realism. The image must depict the subject with creative, educational, or abstract qualities suitable for general audiences.
-2. Narration text: At least 20 words per scene. This will be the voiceover script. Use only standard letters, numbers, spaces, and basic punctuation (periods, commas, question marks, exclamation marks). Avoid special characters, symbols, emojis, or non-ASCII characters.
-3. Scene type: Always "image".
-4. Subtitles enabled: "subtitle": true.
+- If the user provides more than 6 scenes, use a maximum of 6 scenes.
 
-Description: {content}
+Each scene should include:
 
-Return your response ONLY in JSON format following this schema:
+---
+
+### 🎙️ 1. Narration Text (`narration_text`)
+- This is the voiceover for the scene.
+- Must be at least 20 words.
+- Use only standard English letters, numbers, and punctuation (.,!?).
+- No emojis, special characters, currency symbols, or accented letters.
+- Style must vary depending on the scene type:
+  - **Hook** scenes: bold, curiosity-driven, energetic.
+  - **Benefit** scenes: educational, value-driven, persuasive.
+  - **Social Proof** scenes: credible, user-focused, testimonial-like.
+  - **CTA** scenes: short, directive, compelling.
+
+---
+
+### 🖼️ 2. Image Prompt (`prompt_image`)
+Write a **very specific, photorealistic image prompt** in English for each scene, based on the narration text and storytelling intention. Ensure the prompt results in a **high-quality vertical image** (9:16) suitable for mobile social platforms.
+
+#### Include the following:
+- Begin with: “Create an Instagram Reels-style image that features…”
+- Scene-specific intent:
+  - **Hook**: Dynamic, attention-grabbing, emotional impact.
+  - **Benefit**: Realistic product focus, clear visuals of outcome/value.
+  - **Proof**: Visuals of transformation, happy customers, or app results.
+  - **CTA**: Actionable composition — phone screen, button, tap animation.
+- Describe:
+  - **Environment** (setting, background, objects)
+  - **Mood** (emotional tone, lighting style)
+  - **Lighting** (e.g., soft morning light, dramatic shadows)
+  - **Camera Perspective** (e.g., overhead shot, wide-angle, portrait close-up)
+  - **People** (optional, but if used: describe neutrally and inclusively)
+- Make the visual **clean, focused, and eye-catching** for short-form content.
+- **You may include text overlay in the image**, such as callouts or bold headlines — *but if you do, make sure subtitles are not enabled for that scene* to avoid overlap or clutter.
+
+---
+
+### 🎬 3. Scene Type
+Always use: `"type": "image"`
+
+---
+
+### ✍️ 4. Subtitles
+Use: `"subtitle": true`  
+**Exception**: If the image includes **text overlay**, then set `"subtitle": false`
+
+---
+
+### 📦 Output Format (JSON Only)
+
+Return ONLY the following schema:
 
 {{
   "output_filename": "{config.output_filename or 'generated_video.mp4'}",
@@ -145,30 +191,28 @@ Return your response ONLY in JSON format following this schema:
     {{
       "type": "image",
       "narration_text": "Voiceover text (at least 20 words).",
-      "prompt_image": "Detailed image description in English, photorealistic, high resolution, neutral and creative.",
-      "subtitle": true
+      "prompt_image": "Detailed, vivid image prompt aligned with the narration and social video strategy.",
+      "subtitle": true, or false if text overlay is requested in the prompt_image
     }}
   ]
 }}
 
-Extra Instructions for Better Images:
-- Be specific about the environment, mood, lighting, and camera perspective (e.g., "wide-angle shot of a bustling coffee shop with soft morning sunlight").
-- Include colors, textures, and visual elements related to the topic.
-- If people are shown, describe their appearance and clothing neutrally (e.g., "diverse group of professionals in casual attire").
-- Mention the background context to make it visually rich (e.g., "city skyline at sunset behind a rooftop garden").
+---
 
-Subtitle Text Requirements:
-- Use only standard English letters, numbers, spaces, and basic punctuation (.,!?;:-'").
-- Avoid emojis, special symbols, currency signs, mathematical symbols, or any non-ASCII characters.
-- Keep sentences clear and readable for voice synthesis.
-- Use proper capitalization and punctuation for natural speech flow.
+### 🧠 Example Narration + PromptImage
 
-Example PromptImage (Good):
-"A bright, sunlit co-working space with large glass windows, green indoor plants, modern laptops on wooden desks, and a diverse group of professionals collaborating enthusiastically, captured in ultra-realistic detail, sharp focus, soft natural lighting."
+#### ✅ Narration:
+"Ever wondered how creators are scaling their brands with just a few clicks? This new tool changes everything in seconds."
 
-Example Narration Text (Good):
-"Welcome to the world of AI productivity tools that are revolutionizing how we work and manage our daily tasks efficiently."
+#### ✅ Image Prompt:
+"Create an Instagram Reels-style image that features a young content creator in a bright modern studio holding a smartphone with a success graph on screen, ring light glowing, soft natural daylight from the window, vertical 9:16 format, shallow depth of field, vibrant tones, with bold text overlay: 'Grow in Seconds' — do **not** include subtitles for this scene."
+
+---
+
+**Description**:
+{content}
 """
+
         
         try:
             print("🎬 Generating video payload with OpenAI...")

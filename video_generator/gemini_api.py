@@ -48,7 +48,8 @@ def generate_image_from_prompt_gemini(prompt: str, out_path: str, model: str = "
             
             # Build enhanced prompt with context
             enhanced_prompt = build_enhanced_prompt(prompt, scene_context, video_context)
-            
+            logger.info(f"Gemini enhanced prompt: {enhanced_prompt}")
+
             response = client.models.generate_content(
                 model=model,
                 contents=enhanced_prompt,
@@ -124,59 +125,49 @@ def build_enhanced_prompt(base_prompt: str, scene_context: dict = None, video_co
         Enhanced prompt string
     """
     enhanced_parts = []
-    
-    # Add Instagram Reels context
+
     enhanced_parts.append("Create a stunning Instagram Reel image with:")
-    enhanced_parts.append("- 9:16 vertical aspect ratio for mobile viewing")
-    enhanced_parts.append("- High contrast and vibrant colors for social media")
-    enhanced_parts.append("- Professional composition with clear focal points")
-    enhanced_parts.append("- Modern, engaging visual style")
-    enhanced_parts.append("- No text or logos in the image, only the image itself. The image should be a single image, not a composition of multiple images.")
-    enhanced_parts.append("")
-    
-    
-    # Add video context if available
+    enhanced_parts.append("- Optimized for Instagram Reels:")
+    enhanced_parts.append("  * 9:16 aspect ratio (mobile-friendly)")
+    enhanced_parts.append("  * High resolution and vibrant colors")
+    enhanced_parts.append("  * Strong visual hierarchy with clear focal points")
+    enhanced_parts.append("  * No logos or watermarks unless explicitly requested")
+
+    # Add text overlay logic
+    enhanced_parts.append("- If narration or scene prompt requests text in the image, include it as text overlay")
+    enhanced_parts.append("- In that case, set 'subtitle': false to avoid visual clutter")
+
+    # Add visual context
     if video_context:
         if video_context.get('narration_text'):
-            enhanced_parts.append(f"- Visual theme related to: {video_context['narration_text'][:100]}...")
+            enhanced_parts.append(f"- Visual theme related to narration: {video_context['narration_text'][:100]}...")
         if video_context.get('theme'):
-            enhanced_parts.append(f"- the image should be related to the video scene {video_context['theme']}")
-    
-    # Add scene context if available
+            enhanced_parts.append(f"- Style and imagery should match the video theme: {video_context['theme']}")
+
+    # Scene-specific context
     if scene_context:
-        scene_index = scene_context.get('scene_index', 0)
-        total_scenes = scene_context.get('total_scenes', 1)
-        duration = scene_context.get('duration', 10)
+        i = scene_context.get('scene_index', 0)
+        n = scene_context.get('total_scenes', 1)
+        d = scene_context.get('duration', 10)
         
-        enhanced_parts.append(f"- This is scene {scene_index + 1} of {total_scenes}")
-        enhanced_parts.append(f"- Scene duration: {duration} seconds")
+        enhanced_parts.append(f"- This is scene {i+1} of {n} (duration: {d} sec)")
         
-        # Add scene progression context
-        if total_scenes > 1:
-            if scene_index == 0:
-                enhanced_parts.append("- Opening scene: Set the tone and introduce the topic")
-            elif scene_index == total_scenes - 1:
-                enhanced_parts.append("- Closing scene: Provide conclusion or call-to-action")
+        if n > 1:
+            if i == 0:
+                enhanced_parts.append("- Opening scene: Introduce the concept with a strong hook")
+            elif i == n - 1:
+                enhanced_parts.append("- Final scene: Provide a compelling CTA or wrap-up")
             else:
-                enhanced_parts.append("- Middle scene: Build on previous context and maintain flow")
-    
-    # Add the base prompt
+                enhanced_parts.append("- Middle scene: Continue narrative and maintain flow")
+
+    # Main image content
     enhanced_parts.append(f"- Main visual content: {base_prompt}")
-    
-    # Add Instagram Reels optimization
-    enhanced_parts.append("- Optimized for Instagram Reels with:")
-    enhanced_parts.append("  * Eye-catching composition")
-    enhanced_parts.append("  * Strong visual hierarchy")
-    enhanced_parts.append("  * Mobile-friendly details")
-    enhanced_parts.append("  * Social media appeal")
-    
-    # Add technical specifications
-    enhanced_parts.append("- Technical requirements:")
-    enhanced_parts.append("  * 9:16 aspect ratio")
-    enhanced_parts.append("  * High resolution for crisp display")
-    enhanced_parts.append("  * Professional lighting and composition")
-    
+
+    # Emotion prompt
+    enhanced_parts.append("- Image should evoke an emotion appropriate to the scene")
+
     return " ".join(enhanced_parts)
+
 
 if __name__ == "__main__":
     import sys
