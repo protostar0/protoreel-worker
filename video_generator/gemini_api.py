@@ -134,8 +134,9 @@ def build_enhanced_prompt(base_prompt: str, scene_context: dict = None, video_co
     enhanced_parts.append("  * No logos or watermarks unless explicitly requested")
 
     # Add text overlay logic
+    
     enhanced_parts.append("- If narration or scene prompt requests text in the image, include it as text overlay")
-    enhanced_parts.append("- In that case, set 'subtitle': false to avoid visual clutter")
+    enhanced_parts.append("- In that case, set 'subtitle': True in the payload to avoid visual clutter")
 
     # Add visual context
     if video_context:

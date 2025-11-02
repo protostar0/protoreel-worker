@@ -132,6 +132,11 @@ The video must be structured into scenes, totaling **30 to 50 seconds** of runti
 {scene_count_instruction}
 - If the user provides more than 6 scenes, use a maximum of 6 scenes.
 
+**CRITICAL: The LAST scene MUST be a CTA (Call To Action) scene:**
+- The final scene should encourage engagement with text like "Follow for more", "Like for more", "Save for later", or similar
+- Use compelling CTA narration like: "Follow for more tips", "Like if this helped you", "Save this for later", etc.
+- The CTA scene should have a clear, actionable image prompt with text overlay or visual elements that encourage engagement
+
 Each scene should include:
 
 ---
@@ -145,7 +150,7 @@ Each scene should include:
   - **Hook** scenes: bold, curiosity-driven, energetic.
   - **Benefit** scenes: educational, value-driven, persuasive.
   - **Social Proof** scenes: credible, user-focused, testimonial-like.
-  - **CTA** scenes: short, directive, compelling.
+  - **CTA** scenes: short, directive, compelling, with engagement prompts like "Follow for more", "Like for more", "Save for later"
 
 ---
 
@@ -158,7 +163,7 @@ Write a **very specific, photorealistic image prompt** in English for each scene
   - **Hook**: Dynamic, attention-grabbing, emotional impact.
   - **Benefit**: Realistic product focus, clear visuals of outcome/value.
   - **Proof**: Visuals of transformation, happy customers, or app results.
-  - **CTA**: Actionable composition — phone screen, button, tap animation.
+  - **CTA**: Actionable composition — phone screen, button, tap animation, with text overlay like "Follow for more", "Like for more", "Save for later"
 - Describe:
   - **Environment** (setting, background, objects)
   - **Mood** (emotional tone, lighting style)
@@ -192,9 +197,10 @@ Return ONLY the following schema:
       "type": "image",
       "narration_text": "Voiceover text (at least 20 words).",
       "prompt_image": "Detailed, vivid image prompt aligned with the narration and social video strategy.",
-      "subtitle": true, or false if text overlay is requested in the prompt_image
+      "subtitle": true, unless the prompt_image includes a   text overlay, in which case set subtitle to false
     }}
-  ]
+  ],
+    "post_description": "A social caption with hashtags (1-2 hook lines, a value, CTA, and relevant hashtags)"
 }}
 
 ---
@@ -208,6 +214,15 @@ Return ONLY the following schema:
 "Create an Instagram Reels-style image that features a young content creator in a bright modern studio holding a smartphone with a success graph on screen, ring light glowing, soft natural daylight from the window, vertical 9:16 format, shallow depth of field, vibrant tones, with bold text overlay: 'Grow in Seconds' — do **not** include subtitles for this scene."
 
 ---
+
+### 🎯 Final Scene Requirements
+
+**MANDATORY**: The LAST scene in the video MUST be a CTA scene:
+- Narration should encourage engagement: "Follow for more tips", "Like if this helped you", "Save this post for later", "Share with someone who needs this", etc.
+- Image prompt should include text overlay or visual elements that encourage engagement
+- Use phrases like "Follow for more", "Like for more", "Save for later", "Share this", "Follow me", etc.
+- Keep CTA narration short (15-25 words) and compelling
+- Make the visual appealing and action-oriented
 
 **Description**:
 {content}
@@ -224,7 +239,7 @@ Return ONLY the following schema:
                     "Content-Type": "application/json"
                 },
                 json={
-                    "model": "gpt-3.5-turbo",
+                    "model": "gpt-4o-mini",
                     "messages": [
                         {
                             "role": "user",

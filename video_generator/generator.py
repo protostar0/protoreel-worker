@@ -451,8 +451,25 @@ def render_scene(scene: SceneInput, use_global_narration: bool = False, task_id:
                 logger.warning(f"Image editing failed, using original image: {e}", extra={"task_id": task_id})
                 # Continue with original image if editing fails
         
-        # --- Set duration from narration_text if present ---
+        # --- Set duration from narration if available, otherwise use scene duration ---
+        # For image scenes, prefer narration duration to ensure exact sync (no silence padding)
         duration = scene.duration
+        if narration_path and not use_global_narration:
+            try:
+                from moviepy import AudioFileClip
+                narration_clip_temp = AudioFileClip(narration_path)
+                narration_duration = narration_clip_temp.duration
+                narration_clip_temp.close()
+                
+                # Use narration duration for image scenes to avoid silence padding
+                if narration_duration > 0:
+                    duration = narration_duration
+                    logger.info(f"Using narration duration for image scene: {duration:.2f}s (scene duration was {scene.duration}s)", extra={"task_id": task_id})
+                else:
+                    logger.warning(f"Narration duration is 0, using scene duration: {scene.duration}s", extra={"task_id": task_id})
+            except Exception as e:
+                logger.warning(f"Could not get narration duration, using scene duration {scene.duration}s: {e}", extra={"task_id": task_id})
+                # Fall back to scene duration if we can't get narration duration
         try:
             logger.info(f"Creating ImageClip for {image_path}", extra={"task_id": task_id})
             
@@ -637,27 +654,30 @@ def render_scene(scene: SceneInput, use_global_narration: bool = False, task_id:
                 logger.info(f"Adding narration audio to video clip.", extra={"task_id": task_id})
                 narration_clip = AudioFileClip(narration_path)
                 
-                if narration_clip.duration < video_clip.duration:
-                    # Narration is shorter - pad with silence to match video duration
-                    silence = AudioClip(lambda t: 0, duration=video_clip.duration - narration_clip.duration)
-                    narration_padded = CompositeAudioClip([
-                        narration_clip,
-                        silence.with_start(narration_clip.duration)
-                    ])
-                    narration_padded = narration_padded.with_duration(video_clip.duration)
-                    logger.info(f"Narration padded with silence: {narration_clip.duration}s -> {video_clip.duration}s", extra={"task_id": task_id})
-                else:
-                    # Narration is longer - extend video duration to match narration (for image scenes)
-                    extended_duration = narration_clip.duration
-                    logger.info(f"Narration longer than video: extending video from {video_clip.duration}s to {extended_duration}s", extra={"task_id": task_id})
-                    
-                    # For image scenes, extend the duration
-                    if scene.type == "image":
-                        video_clip = video_clip.with_duration(extended_duration)
-                    # For video scenes, we already handled looping above
-                    
-                    # Use the full narration duration
+                # For image scenes: always match video duration to narration (no padding, no extension)
+                # This ensures exact sync with no silence gaps
+                if scene.type == "image":
+                    if narration_clip.duration != video_clip.duration:
+                        # Adjust video clip duration to exactly match narration
+                        video_clip = video_clip.with_duration(narration_clip.duration)
+                        logger.info(f"Image scene: adjusted video duration to match narration exactly: {narration_clip.duration:.2f}s", extra={"task_id": task_id})
                     narration_padded = narration_clip
+                else:
+                    # For video scenes: handle duration mismatch
+                    if narration_clip.duration < video_clip.duration:
+                        # Narration is shorter - pad with silence to match video duration
+                        silence = AudioClip(lambda t: 0, duration=video_clip.duration - narration_clip.duration)
+                        narration_padded = CompositeAudioClip([
+                            narration_clip,
+                            silence.with_start(narration_clip.duration)
+                        ])
+                        narration_padded = narration_padded.with_duration(video_clip.duration)
+                        logger.info(f"Video scene: narration padded with silence: {narration_clip.duration}s -> {video_clip.duration}s", extra={"task_id": task_id})
+                    else:
+                        # Narration is longer - video scenes already handled looping above
+                        # Use the full narration duration
+                        narration_padded = narration_clip
+                        logger.info(f"Video scene: using full narration duration: {narration_clip.duration:.2f}s", extra={"task_id": task_id})
                 
                 video_clip = video_clip.with_audio(narration_padded)
                 logger.info(f"Audio synchronized: video={video_clip.duration}s, narration={narration_padded.duration}s", extra={"task_id": task_id})
@@ -1136,12 +1156,20 @@ def generate_video_core(request_dict, task_id=None):
                 cleanup_files(temp_files + scene_files)
                 cleanup_blurred_background_files()
                 
-                return {
+                # Prepare result with video URL and metadata
+                result = {
                     "r2_url": r2_url,
                     "local_path": output_path,
                     "duration": final_clip.duration if final_clip else 0,
                     "performance_report": optimizer.get_performance_report()
                 }
+                
+                # Add post_description if it exists in the original request
+                if request.get("post_description"):
+                    result["post_description"] = request["post_description"]
+                    logger.info(f"Added post_description to result", extra={"task_id": task_id})
+                
+                return result
                 
             except Exception as e:
                 logger.error(f"Failed to concatenate video clips: {e}", exc_info=True, extra={"task_id": task_id})
