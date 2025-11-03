@@ -1,6 +1,7 @@
 """
 Audio utilities for ProtoVideo.
 Handles narration generation and Whisper-based subtitle generation.
+Uses ElevenLabs API as primary TTS, with ChatterboxTTS as fallback.
 """
 from typing import Optional, List
 import os
@@ -8,7 +9,6 @@ import uuid
 import logging
 import requests
 import threading
-import time
 from video_generator.config import Config
 from chatterbox.tts import ChatterboxTTS
 import torchaudio as ta
@@ -53,14 +53,122 @@ def get_tts_model():
 def generate_cache_key(text: str, audio_prompt_url: Optional[str] = None) -> str:
     """Generate a cache key for narration."""
     import hashlib
-    key_data = f"{text}:{audio_prompt_url or 'none'}"
+    # Include provider in cache key to differentiate ElevenLabs vs ChatterboxTTS results
+    provider = "elevenlabs" if os.environ.get("ELEVENLABS_API_KEY") else "chatterbox"
+    key_data = f"{text}:{audio_prompt_url or 'none'}:{provider}"
     return hashlib.md5(key_data.encode()).hexdigest()
+
+def generate_narration_elevenlabs(
+    text: str,
+    voice_id: Optional[str] = None,
+    model_id: Optional[str] = None,
+    audio_prompt_url: Optional[str] = None
+) -> Optional[str]:
+    """
+    Generate narration using ElevenLabs API.
+    
+    Args:
+        text: Text to convert to speech
+        voice_id: ElevenLabs voice ID (default: uses ELEVENLABS_VOICE_ID env var or defaults to "21m00Tcm4TlvDq8ikWAM")
+        model_id: Model ID (default: "eleven_multilingual_v2" or "eleven_turbo_v2_5" for faster)
+        audio_prompt_url: URL to audio file for voice cloning (optional)
+        
+    Returns:
+        Path to generated audio file, or None if failed
+    """
+    logger = logging.getLogger(__name__)
+    api_key = os.environ.get("ELEVENLABS_API_KEY")
+    
+    if not api_key:
+        logger.info("[NARRATION] ElevenLabs API key not found, will use fallback")
+        return None
+    
+    try:
+        logger.info(f"[NARRATION] Attempting ElevenLabs TTS for text: {text[:60]}...")
+        
+        # Default voice ID (Rachel - high quality female voice)
+        default_voice_id = voice_id or os.environ.get("ELEVENLABS_VOICE_ID", "21m00Tcm4TlvDq8ikWAM")
+        
+        # Default model (can use "eleven_turbo_v2_5" for faster, lower latency)
+        default_model_id = model_id or os.environ.get("ELEVENLABS_MODEL_ID", "eleven_multilingual_v2")
+        
+        # API endpoint
+        url = f"https://api.elevenlabs.io/v1/text-to-speech/{default_voice_id}"
+        
+        headers = {
+            "Accept": "audio/mpeg",
+            "Content-Type": "application/json",
+            "xi-api-key": api_key
+        }
+        
+        # Build request payload
+        data = {
+            "text": text,
+            "model_id": default_model_id,
+            "voice_settings": {
+                "stability": 0.5,
+                "similarity_boost": 0.75,
+                "style": 0.0,
+                "use_speaker_boost": True
+            }
+        }
+        
+        # If audio_prompt_url is provided, try to use it for voice cloning
+        # Note: This requires downloading the audio and potentially creating a voice first
+        # For now, we'll use the voice_id directly
+        
+        logger.info(f"[NARRATION] Calling ElevenLabs API: voice_id={default_voice_id}, model={default_model_id}")
+        
+        response = requests.post(url, json=data, headers=headers, timeout=60)
+        
+        # Check for API errors
+        if response.status_code == 401:
+            logger.warning("[NARRATION] ElevenLabs API: Unauthorized (invalid API key)")
+            return None
+        elif response.status_code == 429:
+            logger.warning("[NARRATION] ElevenLabs API: Rate limit exceeded")
+            return None
+        elif response.status_code == 402:
+            logger.warning("[NARRATION] ElevenLabs API: Payment required (insufficient balance)")
+            return None
+        elif response.status_code != 200:
+            logger.warning(f"[NARRATION] ElevenLabs API error: {response.status_code} - {response.text[:200]}")
+            return None
+        
+        # Save audio to file
+        TEMP_DIR = Config.TEMP_DIR
+        local_filename = os.path.join(TEMP_DIR, f"narration_elevenlabs_{uuid.uuid4().hex}.mp3")
+        
+        with open(local_filename, 'wb') as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                f.write(chunk)
+        
+        # Verify file was created
+        if os.path.exists(local_filename) and os.path.getsize(local_filename) > 0:
+            logger.info(f"[NARRATION] ElevenLabs TTS successful: {local_filename} ({os.path.getsize(local_filename)} bytes)")
+            return local_filename
+        else:
+            logger.warning("[NARRATION] ElevenLabs API returned empty audio file")
+            return None
+            
+    except requests.exceptions.Timeout:
+        logger.warning("[NARRATION] ElevenLabs API timeout, will use fallback")
+        return None
+    except requests.exceptions.RequestException as e:
+        logger.warning(f"[NARRATION] ElevenLabs API request failed: {e}, will use fallback")
+        return None
+    except Exception as e:
+        logger.warning(f"[NARRATION] ElevenLabs API error: {e}, will use fallback", exc_info=True)
+        return None
 
 @cache_result(generate_cache_key)
 def generate_narration(text: str, audio_prompt_url: Optional[str] = None) -> str:
     """
-    Generate narration audio from text using ChatterboxTTS with caching.
-    If audio_prompt_url is provided, use it as the audio_prompt_path.
+    Generate narration audio from text.
+    Primary: ElevenLabs API (if ELEVENLABS_API_KEY is set)
+    Fallback: ChatterboxTTS (local model)
+    
+    If audio_prompt_url is provided, it's passed to the TTS provider (voice cloning for ElevenLabs).
     Returns the path to the generated audio file.
     """
     from video_generator.performance_optimizer import monitor_performance
@@ -73,6 +181,18 @@ def generate_narration(text: str, audio_prompt_url: Optional[str] = None) -> str
         local_filename = os.path.join(TEMP_DIR, f"narration_{uuid.uuid4().hex}.mp3")
         audio_prompt_path = None
         
+        # Try ElevenLabs API first (primary)
+        elevenlabs_result = generate_narration_elevenlabs(
+            text=text,
+            audio_prompt_url=audio_prompt_url
+        )
+        
+        if elevenlabs_result:
+            logger.info(f"[NARRATION] Successfully generated narration using ElevenLabs: {elevenlabs_result}")
+            return elevenlabs_result
+        
+        # Fallback to ChatterboxTTS
+        logger.info("[NARRATION] Falling back to ChatterboxTTS...")
         logger.info(f"[NARRATION] Will save to: {local_filename}")
         logger.info(f"[NARRATION] TEMP_DIR: {TEMP_DIR}")
         logger.info(f"[NARRATION] TEMP_DIR exists: {os.path.exists(TEMP_DIR)}")
@@ -82,7 +202,7 @@ def generate_narration(text: str, audio_prompt_url: Optional[str] = None) -> str
         with _narration_lock:
             try:
                 model = get_tts_model()
-                logger.info(f"[NARRATION] Generating audio...")
+                logger.info(f"[NARRATION] Generating audio with ChatterboxTTS...")
                 
                 if audio_prompt_url:
                     logger.info(f"[NARRATION] Downloading audio prompt from {audio_prompt_url}")
@@ -101,7 +221,7 @@ def generate_narration(text: str, audio_prompt_url: Optional[str] = None) -> str
                         cfg_weight=0.5
                     )
                 
-                logger.info(f"[NARRATION] TTS model generation completed")
+                logger.info(f"[NARRATION] ChatterboxTTS generation completed")
                 logger.info(f"[NARRATION] Audio tensor type: {type(wav)}")
                 logger.info(f"[NARRATION] Audio tensor shape: {wav.shape if hasattr(wav, 'shape') else 'No shape'}")
                 logger.info(f"[NARRATION] Audio tensor dtype: {wav.dtype if hasattr(wav, 'dtype') else 'No dtype'}")
@@ -149,7 +269,7 @@ def generate_narration(text: str, audio_prompt_url: Optional[str] = None) -> str
                 return local_filename
                 
             except Exception as e:
-                logger.error(f"[NARRATION] Failed to generate narration: {e}", exc_info=True)
+                logger.error(f"[NARRATION] Failed to generate narration with ChatterboxTTS: {e}", exc_info=True)
                 # Clean up the file if it was created but we're raising an error
                 if os.path.exists(local_filename):
                     try:

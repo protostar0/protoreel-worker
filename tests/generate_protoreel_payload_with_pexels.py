@@ -670,6 +670,7 @@ The video must be structured into scenes, totaling **30 to 50 seconds** of runti
 - The final scene should encourage engagement with text like "Follow for more", "Like for more", "Save for later", or similar
 - Use compelling CTA narration like: "Follow for more tips", "Like if this helped you", "Save this for later", "Share with someone who needs this", etc.
 - Keep CTA narration short (15-25 words) and compelling
+- **IMPORTANT**: CTA scene will ALWAYS use an AI-generated image (not Pexels video) for better control over CTA messaging
 
 **IMPORTANT:**
 - We will search for Pexels videos based on each scene's narration keywords
@@ -805,14 +806,13 @@ Return ONLY the following schema (without video_url or prompt_image - those will
             # Fallback: return first valid video
             return candidate_videos[0].get("url")
         
-        # Format videos for ChatGPT
+        # Format videos for ChatGPT (limit to 5 for faster processing)
         video_list = []
-        for video in candidate_videos[:15]:  # Limit to 15 candidates for prompt size
+        for video in candidate_videos[:5]:  # Limit to 5 candidates for faster AI selection
             video_list.append({
                 "url": video.get("url", ""),
                 "width": video.get("width", 0),
                 "height": video.get("height", 0),
-                "duration": video.get("duration", 0),
             })
         
         prompt = f"""You are a video content expert. Select the best Pexels video that matches the scene's narration.
@@ -972,23 +972,103 @@ Return ONLY the image prompt text. No explanation or extra text."""
                 f"modern and eye-catching style."
             )
     
+    def check_video_relevance(
+        self,
+        narration_text: str,
+        video_url: str
+    ) -> bool:
+        """
+        Use AI to check if a video is relevant to the scene narration.
+        Uses lenient matching - only rejects clearly irrelevant videos.
+        
+        Args:
+            narration_text: Scene narration text
+            video_url: Video URL to check
+            
+        Returns:
+            True if video is relevant, False otherwise
+        """
+        if not self.openai_api_key:
+            # Fallback: assume video is relevant if we got this far
+            return True
+        
+        try:
+            prompt = f"""You are a video content expert. Determine if a Pexels video is relevant to the scene narration.
+
+**Scene Narration:**
+"{narration_text}"
+
+**Video URL:**
+{video_url}
+
+**Task:**
+Analyze if the video content matches the scene narration's intent, mood, and visual content.
+- Consider: action, environment, subject matter, mood, theme
+- Be LENIENT: Accept videos that are even loosely related
+- Only reject if the video is CLEARLY unrelated or completely off-topic
+- Example: If narration is about "crypto trading", accept videos about: trading, finance, technology, business, computers, etc.
+- Only reject if video is about completely unrelated topics (e.g., nature, animals when talking about business)
+
+**Response Format:**
+Return ONLY "YES" if the video is relevant (even loosely), or "NO" if it's clearly unrelated.
+Example: YES or NO"""
+            
+            response = requests.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {self.openai_api_key}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": "gpt-4o-mini",
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": prompt
+                        }
+                    ],
+                    "max_tokens": 10,
+                    "temperature": 0.3
+                },
+                timeout=15
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                if 'choices' in data and len(data['choices']) > 0:
+                    result = data['choices'][0]['message']['content'].strip().upper()
+                    # Check if result contains "YES" (more lenient)
+                    return "YES" in result.upper()
+            
+            # Fallback: assume relevant
+            return True
+            
+        except Exception as e:
+            print(f"    ⚠️  Video relevance check failed: {e}, assuming relevant")
+            return True  # Fallback: assume relevant
+    
     def enrich_scenes_with_media(
         self, 
         payload: Dict[str, Any], 
-        config: PayloadConfig
+        config: PayloadConfig,
+        original_content: str = ""
     ) -> Dict[str, Any]:
         """
         Enrich each scene with media (video or image) based on scene's narration.
         For each scene:
-        1. Extract keywords from narration
-        2. Search Pexels for videos matching those keywords (all keywords)
-        3. Collect candidate videos and validate them
-        4. Use OpenAI to select best video from candidates based on narration
-        5. If no video found → generate detailed image prompt using OpenAI
+        1. CTA scenes (last scene) ALWAYS use image
+        2. Extract keywords from narration (max 2 keywords)
+        3. Search Pexels for videos matching keywords
+        4. Collect candidate videos (limit to 5 for AI selection)
+        5. Use OpenAI to select best video and check relevance
+        6. Track used videos to avoid duplicates across scenes
+        7. Mix videos and images (not all videos)
+        8. If video not relevant or no video found → use image prompt
         
         Args:
             payload: Payload with scenes structure (narration only)
             config: Payload configuration
+            original_content: Original content/topic to check for user instructions
             
         Returns:
             Payload with enriched scenes (video_url or prompt_image added)
@@ -996,8 +1076,22 @@ Return ONLY the image prompt text. No explanation or extra text."""
         if 'scenes' not in payload:
             return payload
         
+        # Check if user wants all videos
+        force_all_videos = False
+        if original_content:
+            content_lower = original_content.lower()
+            if any(phrase in content_lower for phrase in [
+                "use video for all scenes", "all scenes videos", "only videos",
+                "use videos only", "all video scenes", "pexels videos only"
+            ]):
+                force_all_videos = True
+                print("🎬 User requested: Use videos for all scenes")
+        
         print("\n🎨 Enriching scenes with media (video or image)...")
         enriched_scenes = []
+        used_video_urls = set()  # Track used videos to avoid duplicates
+        total_scenes = len(payload['scenes'])
+        video_count = 0  # Track how many videos we've used
         
         for idx, scene in enumerate(payload['scenes']):
             narration_text = scene.get('narration_text', '')
@@ -1006,38 +1100,63 @@ Return ONLY the image prompt text. No explanation or extra text."""
                 enriched_scenes.append(scene)
                 continue
             
+            is_last_scene = (idx == total_scenes - 1)  # CTA scene (always image)
+            
             print(f"\n  📹 Scene {idx + 1}: '{narration_text[:60]}...'")
             
-            # Extract keywords from this scene's narration
+            # CTA scene (last scene) ALWAYS uses image
+            if is_last_scene:
+                print("    🎯 CTA scene detected - always using image prompt")
+                image_prompt = self.generate_image_prompt_for_scene(narration_text)
+                enriched_scene = scene.copy()
+                enriched_scene["type"] = "image"
+                enriched_scene["prompt_image"] = image_prompt
+                enriched_scenes.append(enriched_scene)
+                continue
+            
+            # Extract keywords from this scene's narration (limit to 2 keywords)
             try:
-                keywords = self.extract_keywords(narration_text, max_keywords=5)
+                keywords = self.extract_keywords(narration_text, max_keywords=2)
                 print(f"    🔑 Keywords for scene {idx + 1}: {', '.join(keywords)}")
             except Exception as e:
                 print(f"    ⚠️  Keyword extraction failed for scene {idx + 1}: {e}")
                 keywords = []
             
-            # Collect candidate videos from all keywords
+            # Collect candidate videos (limit search to get fewer, better results)
             candidate_videos = []
             video_found = False
             
-            if keywords:
+            # Try to find video (unless we need to mix and already have too many videos)
+            # Mix strategy: Prefer videos but ensure variety (not all videos)
+            should_try_video = True
+            if not force_all_videos and total_scenes > 2:
+                # Mix videos and images: try to use videos for at least 1/3 of scenes (but not all)
+                # For 5 scenes (excluding CTA): can use 2-3 videos max
+                non_cta_scenes = total_scenes - 1  # Exclude CTA scene
+                max_videos = max(1, (non_cta_scenes * 2) // 3)  # Use up to 2/3 videos for variety
+                if video_count >= max_videos:
+                    should_try_video = False
+                    print(f"    🎨 Mixing scenes: Already used {video_count}/{max_videos} videos, using image for variety")
+            
+            if should_try_video and keywords:
                 print(f"    🔍 Searching Pexels with {len(keywords)} keywords...")
                 
-                # Search with each keyword and collect valid videos
+                # Search with each keyword and collect valid videos (limit per keyword)
                 for keyword in keywords:
                     try:
                         videos = self.pexels.search_videos(
                             query=keyword,
-                            per_page=min(config.max_pexels_results, 10),  # Limit per keyword to avoid too many candidates
+                            per_page=5,  # Reduced from 10 to 5 for faster searches
                             orientation="portrait"
                         )
                         
-                        # Validate and collect videos
+                        # Collect videos (skip validation for speed - will validate only selected ones)
                         for video in videos:
                             video_url = video.get("url")
                             if video_url:
-                                if self.validate_pexels_video_url(video_url):
-                                    # Avoid duplicates
+                                # Skip if already used in another scene
+                                if video_url not in used_video_urls:
+                                    # Avoid duplicates in candidate list
                                     if not any(v.get("url") == video_url for v in candidate_videos):
                                         candidate_videos.append(video)
                         
@@ -1045,26 +1164,61 @@ Return ONLY the image prompt text. No explanation or extra text."""
                         print(f"    ⚠️  Error searching Pexels for '{keyword}': {e}")
                         continue
                 
-                print(f"    ✅ Found {len(candidate_videos)} valid candidate videos")
+                # Limit candidate list to 5 videos for faster AI selection
+                candidate_videos = candidate_videos[:5]
                 
-                # Use OpenAI to select best video based on narration
                 if candidate_videos:
+                    print(f"    ✅ Found {len(candidate_videos)} candidate videos...")
+                    
+                    # Use OpenAI to select best video from small candidate list
                     print("    🤖 Selecting best video using AI based on narration...")
                     selected_video_url = self.select_best_video_for_scene(narration_text, candidate_videos)
                     
                     if selected_video_url:
-                        print(f"    ✅ Selected best video for scene {idx + 1}")
-                        
-                        # Enrich scene with video
-                        enriched_scene = scene.copy()
-                        enriched_scene["type"] = "video"
-                        enriched_scene["video_url"] = selected_video_url
-                        enriched_scenes.append(enriched_scene)
-                        video_found = True
+                        # Validate only the selected video
+                        if self.validate_pexels_video_url(selected_video_url):
+                            # Check if video is relevant to the scene (lenient check)
+                            print("    🔍 Checking if video is relevant to scene narration...")
+                            is_relevant = self.check_video_relevance(narration_text, selected_video_url)
+                            
+                            if is_relevant:
+                                print(f"    ✅ Selected relevant video for scene {idx + 1}")
+                                
+                                # Mark video as used to avoid duplicates
+                                used_video_urls.add(selected_video_url)
+                                
+                                # Enrich scene with video
+                                enriched_scene = scene.copy()
+                                enriched_scene["type"] = "video"
+                                enriched_scene["video_url"] = selected_video_url
+                                enriched_scenes.append(enriched_scene)
+                                video_found = True
+                                video_count += 1
+                            else:
+                                print("    ❌ Video not relevant to scene, will use image instead")
+                                # Try to find another video from remaining candidates
+                                # Remove the rejected video and try next best
+                                remaining_candidates = [v for v in candidate_videos if v.get("url") != selected_video_url]
+                                if remaining_candidates:
+                                    print("    🔄 Trying next best video from candidates...")
+                                    selected_video_url = self.select_best_video_for_scene(narration_text, remaining_candidates)
+                                    if selected_video_url and self.validate_pexels_video_url(selected_video_url):
+                                        is_relevant_retry = self.check_video_relevance(narration_text, selected_video_url)
+                                        if is_relevant_retry:
+                                            print(f"    ✅ Selected alternative relevant video for scene {idx + 1}")
+                                            used_video_urls.add(selected_video_url)
+                                            enriched_scene = scene.copy()
+                                            enriched_scene["type"] = "video"
+                                            enriched_scene["video_url"] = selected_video_url
+                                            enriched_scenes.append(enriched_scene)
+                                            video_found = True
+                                            video_count += 1
+                        else:
+                            print("    ❌ Selected video failed validation, will use image instead")
             
-            # If no valid video found, use image prompt instead
+            # If no valid/relevant video found, use image prompt instead
             if not video_found:
-                print(f"    🖼️  No valid video found for scene {idx + 1}, generating AI image prompt...")
+                print(f"    🖼️  Using image prompt for scene {idx + 1}...")
                 
                 # Generate detailed image prompt using OpenAI
                 image_prompt = self.generate_image_prompt_for_scene(narration_text)
@@ -1075,7 +1229,9 @@ Return ONLY the image prompt text. No explanation or extra text."""
                 enriched_scenes.append(enriched_scene)
         
         payload['scenes'] = enriched_scenes
-        print(f"\n✅ Enriched {len(enriched_scenes)} scenes with media")
+        print(f"\n✅ Enriched {len(enriched_scenes)} scenes with media:")
+        print(f"   📹 Videos: {video_count}")
+        print(f"   🖼️  Images: {len(enriched_scenes) - video_count}")
         return payload
     
     def validate_selected_video_urls(self, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -1116,13 +1272,8 @@ Return ONLY the image prompt text. No explanation or extra text."""
                         "type": "image",
                         "narration_text": scene.get("narration_text", "Visual content for this scene"),
                         "prompt_image": f"Create an Instagram Reels-style image that features dynamic visual content related to: {scene.get('narration_text', 'visual content')[:100]}. Vertical 9:16 format, vibrant colors, engaging composition.",
-                        "subtitle": scene.get("subtitle", True),
-                        "duration": scene.get("duration", 10)
+                        "subtitle": scene.get("subtitle", True)
                     }
-                    
-                    # Preserve other scene properties
-                    if 'duration' in scene:
-                        converted_scene['duration'] = scene['duration']
                     
                     validated_scenes.append(converted_scene)
                     print(f"    ✅ Converted scene {idx + 1} to image scene")
@@ -1152,9 +1303,9 @@ Return ONLY the image prompt text. No explanation or extra text."""
                         print(f"🧹 Cleaned narration text: '{original_text[:50]}...' -> '{cleaned_text[:50]}...'")
                     scene['narration_text'] = cleaned_text
                     
-                # Ensure scene has duration (will be set by narration in worker)
-                if 'duration' not in scene:
-                    scene['duration'] = 10  # Default duration
+                # Remove duration if present (duration will be set by narration in worker)
+                if 'duration' in scene:
+                    del scene['duration']
         
         # Add logo if provided
         if config.logo_url:
@@ -1209,7 +1360,7 @@ Return ONLY the image prompt text. No explanation or extra text."""
             
             # Step 3: Enrich each scene with media (video or image) based on scene's narration
             print("\n🎨 Enriching scenes with media (searching Pexels per scene)...")
-            payload_json = self.enrich_scenes_with_media(payload_json, config)
+            payload_json = self.enrich_scenes_with_media(payload_json, config, original_content=content)
             
             # Step 4: Enhance payload with optional parameters
             enhanced_payload = self.enhance_payload(payload_json, config)
