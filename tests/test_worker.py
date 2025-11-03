@@ -23,52 +23,48 @@ def test_worker_job_mode():
     # 1. Create a task in the DB
     task_id = str(uuid.uuid4())
     user_api_key = "78c33510dbea4817910ec221c48191c1"
-    payload = json.loads("""
-{
-  "output_filename": "generated_video.mp4",
-  "scenes": [
-    {
-      "narration_text": "Have you heard about Bitcoin's recent silent IPO? This major shift in ownership is making waves in the crypto world as early holders transfer large amounts of BTC to new investors.",
-      "subtitle": true,
-      "type": "image",
-      "prompt_image": "Create an Instagram Reels-style image that features a dynamic, visually striking scene of a bustling cryptocurrency trading floor. In the foreground, a diverse group of young professionals, including a woman with bright blue hair and a man with glasses, are excitedly discussing and analyzing charts displayed on large screens showing Bitcoin prices and trading volumes. The environment is filled with high-tech screens and digital displays, showcasing vibrant graphs and Bitcoin symbols. The background is a sleek, modern office space with a city skyline visible through large glass windows, casting a warm golden light that suggests a late afternoon. The mood is energetic and optimistic, with a sense of anticipation in the air as early Bitcoin holders engage with new investors. The camera perspective is slightly tilted for a dynamic feel, capturing the hustle and bustle of the trading atmosphere, with Bitcoin coins subtly placed on desks and glowing neon accents around the room. The overall color palette is vibrant, with blues, greens, and golds, making the image eye-catching and perfect for social media."
-    },
-    {
-      "narration_text": "In October 2025, approximately 62,000 BTC, valued at around 7 billion dollars, moved from long-term holders to institutional and retail buyers. This orderly exit is designed to avoid destabilizing prices.",
-      "subtitle": true,
-      "type": "image",
-      "prompt_image": "Create an Instagram Reels-style image that features a bustling, modern financial district in October 2025, showcasing a dramatic city skyline under a vibrant sunset. The foreground shows a diverse group of people, including institutional investors in sharp suits and retail buyers in casual attire, gathered around digital screens displaying animated Bitcoin charts and transaction graphics. The atmosphere is dynamic and energetic, with a blend of excitement and anticipation. Bright neon lights from surrounding buildings reflect off glass facades, creating a lively urban glow. The camera perspective is slightly elevated, capturing both the engaged crowd and the soaring skyscrapers in the background, emphasizing the scale of the financial movement. The overall mood is optimistic and forward-looking, with an emphasis on the transition of Bitcoin ownership, highlighted by visually striking graphics of Bitcoin coins transitioning from one wallet to another. The composition is vertical (9:16) to fit social media formats, ensuring the image is eye-catching and engaging for viewers."
-    },
-    {
-      "narration_text": "Long-term holders still control 74 of Bitcoin's supply, but only 16.7 is actively traded. Large institutional investors now account for a staggering 86 of all trading volume.",
-      "subtitle": true,
-      "type": "image",
-      "prompt_image": "Create an Instagram Reels-style image that features a dynamic, modern digital landscape representing the world of Bitcoin trading. The foreground showcases a large, futuristic digital display with vibrant graphs and statistics, highlighting \\\"74% Long-term Holders\\\" and \\\"16.7% Actively Traded\\\" in bold, eye-catching text. Surrounding the display, a diverse group of people of various ethnicities and ages are engaged in animated discussions, with expressions of excitement and curiosity, symbolizing the active trading community. In the background, a sleek city skyline glows under a twilight sky, with neon lights reflecting the mood of innovation and finance. The lighting is dramatic, with bright, colorful accents illuminating the faces of the traders, creating a sense of urgency and engagement. A large, translucent Bitcoin symbol hovers above the scene, pulsating with energy, while a digital ticker tape at the bottom displays \\\"86% Institutional Trading Volume,\\\" emphasizing the dominance of institutional investors. The camera perspective is slightly tilted upwards, creating a dynamic and engaging composition perfect for social media."
-    },
-    {
-      "narration_text": "Companies like BlackRock and corporate treasuries are accumulating Bitcoin, indicating a significant shift towards its adoption as a macroeconomic hedge. This is changing the landscape of cryptocurrency investing.",
-      "subtitle": true,
-      "type": "image",
-      "prompt_image": "Create an Instagram Reels-style image that features a bustling corporate office environment, with a large digital screen displaying a rising Bitcoin graph in the background. In the foreground, a diverse group of corporate professionals—two men in sharp suits and a woman in a stylish blazer—are gathered around a sleek glass table, examining Bitcoin charts on their laptops and tablets. The mood is energetic and optimistic, with warm, inviting lighting casting a glow on their focused expressions. The office is modern and stylish, featuring contemporary furniture and large windows that let in natural light. The camera perspective is slightly angled from above, capturing the dynamic interaction among the team as they discuss strategies, with Bitcoin symbols subtly integrated into the decor. The composition is vibrant and engaging, perfect for social media, with an emphasis on the transformative impact of Bitcoin in the financial world."
-    },
-    {
-      "narration_text": "As Bitcoin transitions from concentrated ownership to a broader base, it becomes more stable and less volatile. This gradual distribution phases mirrors traditional equity market behavior during IPO unlock periods.",
-      "subtitle": true,
-      "type": "image",
-      "prompt_image": "Create an Instagram Reels-style image that features a vibrant, dynamic scene depicting a diverse group of people gathered in a modern urban setting, symbolizing the transition of Bitcoin from concentrated ownership to a broader base. In the foreground, a young woman of Asian descent is enthusiastically showing her smartphone screen displaying a graph of Bitcoin's price stabilizing, surrounded by a diverse group of friends, including a Black man and a Hispanic woman, who are engaged in conversation, all smiling and excited. The background showcases a bustling cityscape with tall buildings and digital billboards displaying Bitcoin symbols and stock market trends, reflecting the fusion of technology and finance. The lighting is bright and energetic, with the golden hues of sunset casting a warm glow over the scene, enhancing the mood of optimism and growth. The composition is framed from a slightly low angle to emphasize the height of the buildings and the energy of the group, creating a sense of upward movement and progress. The image is designed in a vertical 9:16 aspect ratio, optimized for social media platforms."
-    },
-    {
-      "narration_text": "Like this video if you found this information helpful. Follow for more insights into the evolving world of cryptocurrency and stay updated on the latest trends in Bitcoin.",
-      "subtitle": true,
-      "type": "image",
-      "prompt_image": "Create an Instagram Reels-style image that features a young, diverse group of three people enthusiastically discussing cryptocurrency trends in a modern, stylish living room. The scene is filled with colorful decor, including neon lights and digital screens displaying Bitcoin graphs and charts in the background. The mood is energetic and optimistic, with warm, inviting lighting that creates a cozy yet vibrant atmosphere. One person is pointing excitedly at a tablet showing a cryptocurrency app, while another is nodding in agreement, holding a smartphone with the \\\"Like\\\" icon prominently visible. The third person is leaning back on a plush couch, showing a thumbs-up gesture, all set at a dynamic angle to emphasize engagement. The composition is lively, inviting viewers to join the conversation, with a blurred foreground of plants and decorative items for added depth. The image is optimized for social media, capturing the essence of modern digital interaction in a vertical 9:16 format."
+    payload = {
+        "output_filename": "generated_video.mp4",
+        "scenes": [
+            {
+                "narration_text": "Did you know Solana's SOL token dropped nearly 20 right after the U.S. spot ETF launched? This dramatic selloff has left many investors puzzled. Let's find out why.",
+                "subtitle": True,
+                "type": "video",
+                "video_url": "https://videos.pexels.com/video-files/6133983/6133983-uhd_2160_4096_25fps.mp4"
+            },
+            {
+                "narration_text": "Despite strong inflows from the ETF, which typically signals positive sentiment, SOL experienced a sharp decline landing between 175 and 180. This highlights the unpredictable nature of crypto markets.",
+                "subtitle": True,
+                "type": "video",
+                "video_url": "https://videos.pexels.com/video-files/6436549/6436549-uhd_2160_3840_24fps.mp4"
+            },
+            {
+                "narration_text": "SOL is currently testing critical support levels at 180. Analysts warn that if this level fails, we could see a further drop to 150 or even lower. Holding above 180 is crucial for stabilization.",
+                "subtitle": True,
+                "type": "video",
+                "video_url": "https://videos.pexels.com/video-files/6134189/6134189-uhd_2160_4096_25fps.mp4"
+            },
+            {
+                "narration_text": "Rising trading volumes indicate active selling pressure, suggesting traders are reacting swiftly to market changes. This shift in sentiment emphasizes caution among investors at this time.",
+                "subtitle": True,
+                "type": "image",
+                "prompt_image": "Create an Instagram Reels-style image that features a bustling trading floor filled with diverse traders of various ethnicities, intensely focused on their screens displaying fluctuating stock charts and graphs. The environment is dynamic, with bright LED screens illuminating the space, casting vibrant blues, greens, and reds that reflect the active trading atmosphere. Traders are seen with furrowed brows, some pointing at their screens while others are speaking into headsets, showcasing their swift reactions to market changes. The mood is tense yet energetic, emphasizing a sense of urgency and caution among investors. The camera perspective is slightly elevated, capturing the chaos below with a depth of field that highlights both the traders and the screens, creating an engaging and immersive experience. The lighting is bright, with a mix of natural light streaming through large windows and the artificial glow from the screens, enhancing the modern, vibrant feel of the scene. The composition should be vertical 9:16, optimized for social media engagement."
+            },
+            {
+                "narration_text": "While the short-term outlook appears bearish, some analysts believe this could be a 'buy the dip' opportunity for those willing to take on risk, viewing Solana as a long-term investment.",
+                "subtitle": True,
+                "type": "image",
+                "prompt_image": "Create an Instagram Reels-style image that features a dynamic trading room filled with diverse young professionals engaged in animated discussions about cryptocurrency. The environment is sleek and modern, illuminated by bright LED screens displaying fluctuating Solana charts and bullish market trends. The mood is a blend of optimism and tension, with some analysts cheerfully pointing at a screen showing the phrase \"Buy the Dip!\" while others look contemplative, analyzing graphs. The composition is slightly tilted to give a sense of action, with a close-up of a hand gesturing towards a bullish trend line on a digital tablet. The background is filled with vibrant colors—greens for growth, reds for caution—creating a striking contrast. The camera perspective is from a low angle, making the analysts appear empowered and engaged, emphasizing the high-stakes atmosphere of investment. The vertical 9:16 format is designed to capture attention on social media platforms, ensuring an engaging and visually stimulating experience."
+            },
+            {
+                "narration_text": "Like if this helped you understand Solana's recent moves, and follow for more crypto insights and updates. Stay informed and make smart investment choices!",
+                "subtitle": True,
+                "type": "image",
+                "prompt_image": "Create an Instagram Reels-style image that features a dynamic split-screen layout. On the left side, depict a modern workspace with a sleek laptop showcasing a colorful graph of Solana's price movements. The screen should display bright green and blue upward trends with animated elements like arrows and icons representing growth. A confident young adult, casually dressed, leans over the laptop, pointing at the graph with an enthusiastic smile, embodying the spirit of making smart investment choices. \n\nOn the right side, illustrate a vibrant digital landscape with abstract cryptocurrency symbols swirling around, including the Solana logo, dollar signs, and coins, all glowing in a bright neon palette. The background should have a gradient of deep blue to purple, creating a tech-savvy and futuristic atmosphere. \n\nUse warm, natural lighting to illuminate the workspace while the digital landscape is enhanced with glowing effects, creating a contrast that draws the eye. The overall mood should be energetic and inspiring, encouraging viewers to stay informed about crypto. The composition should invite"
+            }
+        ],
+        "post_description": "Solana's SOL token is on a wild ride! 🚀 Are you in or out? Discover what's happening with the ETF launch and where the price might go. Like and follow for more crypto insights! #Solana #CryptoNews #InvestSmart"
     }
-  ],
-  "post_description": "Explore the recent shift in Bitcoin ownership with our breakdown of the silent IPO dynamics. Learn how institutional adoption is shaping the future of cryptocurrency! Like for more insights! #Bitcoin #Crypto #Investing #BitcoinIPO"
-}
-""")
-    
-    
     
     create_task(task_id, user_api_key, payload)
     print(f"PYTHONPATH=. python main_worker.py --task-id {task_id}  --api-key {user_api_key}")

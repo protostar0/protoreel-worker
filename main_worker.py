@@ -23,8 +23,10 @@ def parse_arguments():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(description='Protoreel Worker - Video Generation Service')
     parser.add_argument('task_id', nargs='?', help='Task ID to process')
-    parser.add_argument('--api-key', dest='api_key', help='API key for authentication')
+    parser.add_argument('--api-key', dest='api_key', help='API key for authentication (required for --url or --prompt)')
     parser.add_argument('--task-id', dest='task_id_alt', help='Task ID (alternative to positional argument)')
+    parser.add_argument('--url', help='URL to generate video from (creates task and processes)')
+    parser.add_argument('--prompt', help='Prompt/topic to generate video from (creates task and processes)')
     parser.add_argument('--verbose', '-v', action='store_true', help='Enable verbose logging')
     parser.add_argument('--debug', action='store_true', help='Enable debug mode')
     parser.add_argument('--config', help='Path to configuration file')
@@ -34,6 +36,10 @@ def parse_arguments():
     # Handle task_id from either positional argument or --task-id flag
     if args.task_id_alt and not args.task_id:
         args.task_id = args.task_id_alt
+    
+    # Validate: if --url or --prompt is provided, --api-key is required
+    if (args.url or args.prompt) and not args.api_key:
+        parser.error("--api-key is required when using --url or --prompt")
     
     return args
 
@@ -264,73 +270,144 @@ def error_recovery_context(task_id):
             except (OSError, ValueError):
                 pass
 
-def process_all_pending_tasks():
+def generate_payload_and_create_task(api_key: str, url: str = None, prompt: str = None):
+    """
+    Generate payload from URL or prompt and create a task.
+    
+    Args:
+        api_key: User API key for authentication
+        url: URL to generate video from (optional)
+        prompt: Prompt/topic to generate video from (optional)
+        
+    Returns:
+        task_id: The created task ID
+    """
+    import uuid
+    from db import create_task
+    from generate_protoreel_payload_with_pexels import PayloadGeneratorWithPexels, PayloadConfig
+    
+    if not url and not prompt:
+        raise ValueError("Either --url or --prompt must be provided")
+    
+    if url and prompt:
+        raise ValueError("Cannot provide both --url and --prompt. Use one or the other.")
+    
+    logger.info("[PAYLOAD GEN] Starting payload generation...")
+    
+    try:
+        # Initialize payload generator
+        generator = PayloadGeneratorWithPexels()
+        
+        # Create config
+        config = PayloadConfig(
+            topic=prompt or url,
+            url=url if url else None,
+            subtitle_enabled=True
+        )
+        
+        # Generate payload
+        logger.info(f"[PAYLOAD GEN] Generating payload from {'URL' if url else 'prompt'}...")
+        payload = generator.generate_payload(config)
+        
+        logger.info(f"[PAYLOAD GEN] Payload generated successfully with {len(payload.get('scenes', []))} scenes")
+        
+        # Create task
+        task_id = str(uuid.uuid4())
+        logger.info(f"[PAYLOAD GEN] Creating task {task_id}...")
+        
+        create_task(task_id, api_key, payload)
+        logger.info(f"[PAYLOAD GEN] Task {task_id} created successfully")
+        
+        return task_id
+        
+    except Exception as e:
+        logger.error(f"[PAYLOAD GEN] Failed to generate payload and create task: {e}", exc_info=True)
+        raise
+
+
+def process_all_pending_tasks(task_id_override=None):
+    """
+    Process a pending task.
+    
+    Args:
+        task_id_override: Optional task_id to use (takes precedence over sys.argv parsing)
+    """
     import sys
     from db import get_task_by_id, update_task_status
     
     logger.info("[JOB MODE] Starting process_all_pending_tasks...")
     
-    # Parse arguments manually for backward compatibility
-    task_id = None
-    api_key = None
-    verbose = False
-    debug = False
-    config_file = None
-    
-    i = 1
-    while i < len(sys.argv):
-        arg = sys.argv[i]
+    # If task_id is provided as parameter, use it directly
+    if task_id_override:
+        task_id = task_id_override
+        logger.info(f"[JOB MODE] Using provided task_id: {task_id}")
+        # Skip argument parsing when task_id is provided directly
+        # Environment variables are already set in main()
+    else:
+        # Parse arguments manually for backward compatibility
+        task_id = None
+        api_key = None
+        verbose = False
+        debug = False
+        config_file = None
         
-        if arg == "--api-key" and i + 1 < len(sys.argv):
-            api_key = sys.argv[i + 1]
-            i += 2
-        elif arg.startswith("--api-key="):
-            api_key = arg.split("=", 1)[1]
-            i += 1
-        elif arg == "--task-id" and i + 1 < len(sys.argv):
-            task_id = sys.argv[i + 1]
-            i += 2
-        elif arg.startswith("--task-id="):
-            task_id = arg.split("=", 1)[1]
-            i += 1
-        elif arg in ["--verbose", "-v"]:
-            verbose = True
-            i += 1
-        elif arg == "--debug":
-            debug = True
-            i += 1
-        elif arg == "--config" and i + 1 < len(sys.argv):
-            config_file = sys.argv[i + 1]
-            i += 2
-        elif arg.startswith("--config="):
-            config_file = arg.split("=", 1)[1]
-            i += 1
-        elif arg == "--help" or arg == "-h":
-            print("[JOB MODE] Usage: python main_worker.py <task_id> or --task-id=<task_id>")
-            print("[JOB MODE] Optional: --api-key <key> --verbose --debug --config <file>")
-            sys.exit(0)
-        elif not arg.startswith("-") and task_id is None:
-            task_id = arg
-            i += 1
-        else:
-            i += 1
-    
-    # Set environment variables for arguments
-    if api_key:
-        os.environ['API_KEY'] = api_key
-        logger.info("[ARGS] API key set from command line argument")
-    
-    if verbose:
-        os.environ['VERBOSE'] = 'true'
-        logger.info("[ARGS] Verbose logging enabled")
-    
-    if debug:
-        os.environ['DEBUG'] = 'true'
-        logger.info("[ARGS] Debug mode enabled")
-    
-    if config_file:
-        os.environ['CONFIG_FILE'] = config_file
-        logger.info(f"[ARGS] Configuration file set to: {config_file}")
+        i = 1
+        while i < len(sys.argv):
+            arg = sys.argv[i]
+            
+            if arg == "--api-key" and i + 1 < len(sys.argv):
+                api_key = sys.argv[i + 1]
+                i += 2
+            elif arg.startswith("--api-key="):
+                api_key = arg.split("=", 1)[1]
+                i += 1
+            elif arg == "--task-id" and i + 1 < len(sys.argv):
+                task_id = sys.argv[i + 1]
+                i += 2
+            elif arg.startswith("--task-id="):
+                task_id = arg.split("=", 1)[1]
+                i += 1
+            elif arg in ["--verbose", "-v"]:
+                verbose = True
+                i += 1
+            elif arg == "--debug":
+                debug = True
+                i += 1
+            elif arg == "--config" and i + 1 < len(sys.argv):
+                config_file = sys.argv[i + 1]
+                i += 2
+            elif arg.startswith("--config="):
+                config_file = arg.split("=", 1)[1]
+                i += 1
+            elif arg == "--help" or arg == "-h":
+                print("[JOB MODE] Usage: python main_worker.py <task_id> or --task-id=<task_id>")
+                print("[JOB MODE] Optional: --api-key <key> --verbose --debug --config <file>")
+                sys.exit(0)
+            elif not arg.startswith("-") and task_id is None:
+                # Only use positional argument if it looks like a UUID or task ID
+                # Skip if it contains spaces (likely a prompt/topic)
+                if " " not in arg:
+                    task_id = arg
+                i += 1
+            else:
+                i += 1
+        
+        # Set environment variables for arguments (only when parsing from sys.argv)
+        if api_key:
+            os.environ['API_KEY'] = api_key
+            logger.info("[ARGS] API key set from command line argument")
+        
+        if verbose:
+            os.environ['VERBOSE'] = 'true'
+            logger.info("[ARGS] Verbose logging enabled")
+        
+        if debug:
+            os.environ['DEBUG'] = 'true'
+            logger.info("[ARGS] Debug mode enabled")
+        
+        if config_file:
+            os.environ['CONFIG_FILE'] = config_file
+            logger.info(f"[ARGS] Configuration file set to: {config_file}")
     
     if not task_id:
         logger.error("[JOB MODE] No task_id provided. Usage: python main_worker.py <task_id> or --task-id=<task_id>")
@@ -602,6 +679,30 @@ if __name__ == "__main__":
         os.environ['CONFIG_FILE'] = args.config
         logger.info(f"[ARGS] Configuration file set to: {args.config}")
     
+    # Check if URL or prompt is provided (new mode: generate payload and process)
+    if args.url or args.prompt:
+        if not args.api_key:
+            logger.error("[ERROR] --api-key is required when using --url or --prompt")
+            sys.exit(1)
+        
+        try:
+            logger.info("[MODE] Payload generation mode: generating payload and creating task...")
+            task_id = generate_payload_and_create_task(
+                api_key=args.api_key,
+                url=args.url,
+                prompt=args.prompt
+            )
+            
+            logger.info(f"[MODE] Payload generated and task {task_id} created. Processing task...")
+            
+            # Process the newly created task directly
+            process_all_pending_tasks(task_id_override=task_id)
+            sys.exit(0)
+            
+        except Exception as e:
+            logger.error(f"[ERROR] Failed to generate payload and create task: {e}", exc_info=True)
+            sys.exit(1)
+    
     # Check if task_id is provided
     if not args.task_id:
         logger.info("[TIMEOUT CHECKER] No task_id provided, running timeout checker...")
@@ -638,5 +739,5 @@ if __name__ == "__main__":
         
         sys.exit(0)
     
-    # Process the task
+    # Process the task (from command line arguments)
     process_all_pending_tasks() 
