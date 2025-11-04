@@ -270,20 +270,17 @@ def error_recovery_context(task_id):
             except (OSError, ValueError):
                 pass
 
-def generate_payload_and_create_task(api_key: str, url: str = None, prompt: str = None):
+def generate_payload(url: str = None, prompt: str = None):
     """
-    Generate payload from URL or prompt and create a task.
+    Generate payload from URL or prompt.
     
     Args:
-        api_key: User API key for authentication
         url: URL to generate video from (optional)
         prompt: Prompt/topic to generate video from (optional)
         
     Returns:
-        task_id: The created task ID
+        payload: Generated payload dictionary
     """
-    import uuid
-    from db import create_task
     from generate_protoreel_payload_with_pexels import PayloadGeneratorWithPexels, PayloadConfig
     
     if not url and not prompt:
@@ -311,18 +308,86 @@ def generate_payload_and_create_task(api_key: str, url: str = None, prompt: str 
         
         logger.info(f"[PAYLOAD GEN] Payload generated successfully with {len(payload.get('scenes', []))} scenes")
         
-        # Create task
-        task_id = str(uuid.uuid4())
-        logger.info(f"[PAYLOAD GEN] Creating task {task_id}...")
-        
-        create_task(task_id, api_key, payload)
-        logger.info(f"[PAYLOAD GEN] Task {task_id} created successfully")
-        
-        return task_id
+        return payload
         
     except Exception as e:
-        logger.error(f"[PAYLOAD GEN] Failed to generate payload and create task: {e}", exc_info=True)
+        logger.error(f"[PAYLOAD GEN] Failed to generate payload: {e}", exc_info=True)
         raise
+
+
+def generate_payload_and_create_task(api_key: str, url: str = None, prompt: str = None):
+    """
+    Generate payload from URL or prompt and create a task.
+    
+    Args:
+        api_key: User API key for authentication
+        url: URL to generate video from (optional)
+        prompt: Prompt/topic to generate video from (optional)
+        
+    Returns:
+        task_id: The created task ID
+    """
+    import uuid
+    from db import create_task
+    
+    payload = generate_payload(url, prompt)
+    
+    # Create task
+    task_id = str(uuid.uuid4())
+    logger.info(f"[PAYLOAD GEN] Creating task {task_id}...")
+    
+    create_task(task_id, api_key, payload)
+    logger.info(f"[PAYLOAD GEN] Task {task_id} created successfully")
+    
+    return task_id
+
+
+def generate_payload_and_update_task(task_id: str, api_key: str, url: str = None, prompt: str = None):
+    """
+    Generate payload from URL or prompt and update existing task.
+    
+    Args:
+        task_id: Existing task ID to update
+        api_key: User API key for authentication
+        url: URL to generate video from (optional)
+        prompt: Prompt/topic to generate video from (optional)
+        
+    Returns:
+        task_id: The updated task ID
+    """
+    from db import get_task_by_id, SessionLocal
+    
+    # Verify task exists
+    task = get_task_by_id(task_id)
+    if not task:
+        raise ValueError(f"Task {task_id} not found in database")
+    
+    # Verify API key matches
+    if task.user_api_key != api_key:
+        raise ValueError(f"API key mismatch for task {task_id}")
+    
+    payload = generate_payload(url, prompt)
+    
+    # Update task payload
+    logger.info(f"[PAYLOAD GEN] Updating task {task_id} with new payload...")
+    
+    # Update task's request_payload using SessionLocal directly
+    db = SessionLocal()
+    try:
+        # Import Task model from db
+        from db import Task
+        db_task = db.query(Task).filter(Task.id == task_id).first()
+        if db_task:
+            db_task.request_payload = payload
+            db_task.status = 'queued'  # Reset status to queued
+            db.commit()
+            logger.info(f"[PAYLOAD GEN] Task {task_id} updated successfully with new payload")
+        else:
+            raise ValueError(f"Task {task_id} not found when updating")
+    finally:
+        db.close()
+    
+    return task_id
 
 
 def process_all_pending_tasks(task_id_override=None):
@@ -679,28 +744,43 @@ if __name__ == "__main__":
         os.environ['CONFIG_FILE'] = args.config
         logger.info(f"[ARGS] Configuration file set to: {args.config}")
     
-    # Check if URL or prompt is provided (new mode: generate payload and process)
+    # Handle different scenarios:
+    # 1. task-id + prompt/url: generate payload, update task, process
+    # 2. Only prompt/url: generate payload, create task, process
+    # 3. Only task-id: fetch task from DB and process (handled in process_all_pending_tasks)
+    
     if args.url or args.prompt:
         if not args.api_key:
             logger.error("[ERROR] --api-key is required when using --url or --prompt")
             sys.exit(1)
         
         try:
-            logger.info("[MODE] Payload generation mode: generating payload and creating task...")
-            task_id = generate_payload_and_create_task(
-                api_key=args.api_key,
-                url=args.url,
-                prompt=args.prompt
-            )
+            if args.task_id:
+                # Scenario 1: task-id + prompt/url -> update existing task
+                logger.info(f"[MODE] Updating task {args.task_id} with generated payload...")
+                task_id = generate_payload_and_update_task(
+                    task_id=args.task_id,
+                    api_key=args.api_key,
+                    url=args.url,
+                    prompt=args.prompt
+                )
+                logger.info(f"[MODE] Task {task_id} updated with new payload. Processing task...")
+            else:
+                # Scenario 2: Only prompt/url -> create new task
+                logger.info("[MODE] Creating new task with generated payload...")
+                task_id = generate_payload_and_create_task(
+                    api_key=args.api_key,
+                    url=args.url,
+                    prompt=args.prompt
+                )
+                logger.info(f"[MODE] Task {task_id} created with payload. Processing task...")
             
-            logger.info(f"[MODE] Payload generated and task {task_id} created. Processing task...")
-            
-            # Process the newly created task directly
+            # Process the task directly
             process_all_pending_tasks(task_id_override=task_id)
             sys.exit(0)
             
         except Exception as e:
-            logger.error(f"[ERROR] Failed to generate payload and create task: {e}", exc_info=True)
+            logger.error(f"[ERROR] Failed to generate payload and {'update' if args.task_id else 'create'} task: {e}", exc_info=True)
             sys.exit(1)
     
     # Check if task_id is provided
