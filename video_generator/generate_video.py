@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Video generation module using LumaAI API.
-This module handles generating video scenes from text prompts using LumaAI's video generation service.
+Video generation module supporting LumaAI and KlingAI APIs.
+This module handles generating video scenes from text prompts or images using various video generation services.
 """
 
 import os
@@ -14,22 +14,26 @@ from video_generator.logging_utils import get_logger
 logger = get_logger()
 
 def generate_video_from_prompt(
-    prompt: str, 
-    duration: str = "5s", 
-    resolution: str = "720p", 
+    prompt: str,
+    image_url: Optional[str] = None,
+    duration: str = "5s",
+    resolution: str = "720p",
     aspect_ratio: str = "9:16",
-    model: str = "ray-2",
+    model: str = None,
+    provider: str = None,
     task_id: Optional[str] = None
 ) -> str:
     """
-    Generate a video from a text prompt using LumaAI API.
+    Generate a video from a text prompt (and optionally an image) using LumaAI or KlingAI API.
     
     Args:
         prompt: Text description of the video to generate
-        duration: Video duration (e.g., "5s", "10s")
-        resolution: Video resolution (e.g., "720p", "1080p")
+        image_url: Optional image URL for image+text-to-video generation (KlingAI only)
+        duration: Video duration (e.g., "5s", "10s") for LumaAI, or seconds (int) for KlingAI
+        resolution: Video resolution (e.g., "720p", "1080p") - LumaAI only
         aspect_ratio: Video aspect ratio (e.g., "9:16", "16:9", "1:1")
-        model: LumaAI model to use (default: "ray-2")
+        model: Model to use (LumaAI: "ray-2", KlingAI: "kling", "kling-2.0", etc.)
+        provider: Video generation provider ("lumaai" or "klingai"). Defaults to Config.DEFAULT_VIDEO_PROVIDER
         task_id: Task ID for logging
         
     Returns:
@@ -38,6 +42,35 @@ def generate_video_from_prompt(
     Raises:
         RuntimeError: If video generation fails or API key is missing
     """
+    # Determine provider
+    if provider is None:
+        provider = Config.DEFAULT_VIDEO_PROVIDER
+    
+    provider = provider.lower()
+    
+    # Set default model based on provider if not specified
+    if model is None:
+        if provider == "klingai":
+            model = "kling-v1"
+        else:  # lumaai
+            model = "ray-2"
+    
+    if provider == "klingai":
+        return _generate_video_klingai(prompt, image_url, duration, aspect_ratio, model, task_id)
+    elif provider == "lumaai":
+        return _generate_video_lumaai(prompt, duration, resolution, aspect_ratio, model, task_id)
+    else:
+        raise ValueError(f"Unsupported video provider: {provider}. Use 'lumaai' or 'klingai'")
+
+def _generate_video_lumaai(
+    prompt: str,
+    duration: str = "5s",
+    resolution: str = "720p",
+    aspect_ratio: str = "9:16",
+    model: str = "ray-2",
+    task_id: Optional[str] = None
+) -> str:
+    """Generate video using LumaAI API (text-to-video only)."""
     try:
         # Check if LumaAI API key is available
         api_key = os.environ.get("LUMAAI_API_KEY")
@@ -118,8 +151,35 @@ def generate_video_from_prompt(
         return video_path
         
     except Exception as e:
-        logger.error(f"Failed to generate video from prompt: {e}", exc_info=True, extra={"task_id": task_id})
-        raise RuntimeError(f"Video generation failed: {e}")
+        logger.error(f"Failed to generate video from prompt using LumaAI: {e}", exc_info=True, extra={"task_id": task_id})
+        raise RuntimeError(f"LumaAI video generation failed: {e}")
+
+def _generate_video_klingai(
+    prompt: str,
+    image_url: Optional[str] = None,
+    duration: str = "5s",
+    aspect_ratio: str = "9:16",
+    model: str = "kling-v1",
+    task_id: Optional[str] = None
+) -> str:
+    """Generate video using KlingAI API (text-to-video or image+text-to-video)."""
+    from video_generator.klingai_api import generate_video_from_prompt as klingai_generate, validate_klingai_settings
+    
+    # Convert duration string to int for KlingAI
+    duration_seconds = get_video_duration_seconds(duration)
+    
+    # Validate settings
+    duration_seconds, aspect_ratio, model = validate_klingai_settings(duration_seconds, aspect_ratio, model)
+    
+    # Generate video using KlingAI
+    return klingai_generate(
+        prompt=prompt,
+        image_url=image_url,
+        duration=duration_seconds,
+        aspect_ratio=aspect_ratio,
+        model=model,
+        task_id=task_id
+    )
 
 def get_video_duration_seconds(duration_str: str) -> int:
     """

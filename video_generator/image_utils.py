@@ -245,11 +245,18 @@ def generate_image_from_prompt(prompt: str, api_key: str, out_path: str, provide
         logger.info(f"Generating image with {provider} API. Prompt: {prompt[:50]}...")
         
         # Define fallback providers in order of preference
+        # For e-commerce workflows (when product_images are present), prioritize OpenAI and avoid Gemini fallback
+        has_product_images = video_context and isinstance(video_context, dict) and video_context.get('product_images')
+        
         fallback_providers = []
         if provider.lower() == "gemini":
             fallback_providers = ["openai", "freepik"]
         elif provider.lower() == "openai":
-            fallback_providers = ["gemini", "freepik"]
+            # For e-commerce, don't fall back to Gemini (it doesn't support product image analysis)
+            if has_product_images:
+                fallback_providers = ["freepik"]  # Only fallback to Freepik, not Gemini
+            else:
+                fallback_providers = ["gemini", "freepik"]
         elif provider.lower() == "freepik":
             fallback_providers = ["openai", "gemini"]
         
@@ -264,7 +271,11 @@ def generate_image_from_prompt(prompt: str, api_key: str, out_path: str, provide
                 if attempt_provider == "freepik":
                     return generate_image_from_prompt_freepik(prompt, api_key, out_path)
                 elif attempt_provider == "openai":
-                    return _generate_image_from_prompt(prompt, api_key, out_path)
+                    # Extract product_images from video_context if available
+                    product_images = None
+                    if video_context and isinstance(video_context, dict):
+                        product_images = video_context.get('product_images', [])
+                    return _generate_image_from_prompt(prompt, api_key, out_path, product_images=product_images)
                 elif attempt_provider == "gemini":
                     return generate_image_from_prompt_gemini(prompt, out_path, 
                                                            scene_context=scene_context, 

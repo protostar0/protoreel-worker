@@ -228,11 +228,13 @@ class SceneInput(BaseModel):
     prompt_edit_image: Optional[str] = None  # AI prompt to edit existing image
     image_provider: Optional[str] = Config.DEFAULT_IMAGE_PROVIDER  # "openai", "freepik", or "gemini"
     video_url: Optional[str] = None  # URL to existing video file
-    prompt_video: Optional[str] = None  # AI prompt to generate video using LumaAI
-    video_resolution: Optional[str] = "720p"  # Video resolution (720p, 1080p, 1440p)
+    prompt_video: Optional[str] = None  # AI prompt to generate video using LumaAI or KlingAI
+    prompt_video_image: Optional[str] = None  # Optional image URL for image+text-to-video (KlingAI only)
+    video_provider: Optional[str] = None  # Video generation provider ("lumaai" or "klingai"). Defaults to Config.DEFAULT_VIDEO_PROVIDER
+    video_resolution: Optional[str] = "720p"  # Video resolution (720p, 1080p, 1440p) - LumaAI only
     video_aspect_ratio: Optional[str] = "9:16"  # Video aspect ratio (9:16, 16:9, 1:1, 4:3, 3:4)
     video_duration: Optional[str] = "5s"  # Video duration (5s, 10s, etc.)
-    video_model: Optional[str] = "ray-2"  # LumaAI model to use
+    video_model: Optional[str] = None  # Model to use (LumaAI: "ray-2", KlingAI: "kling", "kling-2.0", etc.)
     narration: Optional[str] = None
     narration_text: Optional[str] = None
     audio_prompt_url: Optional[str] = None
@@ -426,12 +428,39 @@ def render_scene(scene: SceneInput, use_global_narration: bool = False, task_id:
                 logger.error(f"Unsupported image provider: {provider}", extra={"task_id": task_id})
                 raise RuntimeError(f"Unsupported image provider: {provider}")
             
-            out_path = os.path.join(tempfile.gettempdir(), f"generated_{uuid.uuid4().hex}.png")
+            # For OpenAI images, save to ./tmp and don't delete
+            if provider == "openai":
+                # Create ./tmp directory if it doesn't exist
+                tmp_dir = "./tmp"
+                os.makedirs(tmp_dir, exist_ok=True)
+                out_path = os.path.join(tmp_dir, f"openai_generated_{uuid.uuid4().hex}.png")
+            else:
+                out_path = os.path.join(tempfile.gettempdir(), f"generated_{uuid.uuid4().hex}.png")
+            
             try:
-                logger.info(f"[{scene_id}] Generating image from prompt using {provider}: {scene.prompt_image}", extra={"task_id": task_id})
-                image_path = generate_image_from_prompt(scene.prompt_image, api_key, out_path, provider=provider, scene_context=scene_context, video_context=video_context)
-                temp_files.append(image_path)
-                logger.info(f"Generated image from prompt: {image_path}", extra={"task_id": task_id})
+                # Note: Product images will be analyzed by GPT-4 Vision in generate_image_from_prompt
+                # to enhance the prompt with actual visual details from the product images
+                enhanced_prompt = scene.prompt_image
+                
+                # Get product images from video_context (will be used by GPT-4 Vision for analysis)
+                product_images = None
+                if video_context and isinstance(video_context, dict):
+                    product_images = video_context.get('product_images', [])
+                    if product_images and isinstance(product_images, list) and len(product_images) > 0:
+                        logger.info(f"[{scene_id}] Found {len(product_images)} product image(s) in video_context - will be analyzed with GPT-4 Vision", extra={"task_id": task_id})
+                
+                logger.info(f"[{scene_id}] Generating image from prompt using {provider}: {enhanced_prompt[:100]}...", extra={"task_id": task_id})
+                image_path = generate_image_from_prompt(enhanced_prompt, api_key, out_path, provider=provider, scene_context=scene_context, video_context=video_context)
+                
+                # Only add to temp_files if not OpenAI (keep OpenAI images)
+                if provider != "openai":
+                    temp_files.append(image_path)
+                    logger.info(f"Generated image from prompt: {image_path}", extra={"task_id": task_id})
+                else:
+                    logger.info(f"[{scene_id}] ✅ OpenAI image saved to: {os.path.abspath(image_path)}", extra={"task_id": task_id})
+                
+                # Store generated image path for potential use in video generation
+                generated_image_path = image_path
             except Exception as e:
                 logger.error(f"Image generation failed: {e}", exc_info=True, extra={"task_id": task_id})
                 raise
@@ -525,26 +554,141 @@ def render_scene(scene: SceneInput, use_global_narration: bool = False, task_id:
             except Exception as e:
                 logger.warning(f"Failed to get narration duration, using scene duration: {e}", extra={"task_id": task_id})
         
-        # Handle video generation from prompt using LumaAI
+        # Handle video generation from prompt using LumaAI or KlingAI
         if scene.prompt_video:
             try:
                 from video_generator.generate_video import generate_video_from_prompt, validate_video_settings
                 
-                # Validate and normalize video settings
+                # Get provider (default from config or scene-specific)
+                provider = getattr(scene, 'video_provider', None) or Config.DEFAULT_VIDEO_PROVIDER
+                provider = provider.lower()
+                
+                # Get video settings
                 resolution = getattr(scene, 'video_resolution', '720p')
                 aspect_ratio = getattr(scene, 'video_aspect_ratio', '9:16')
                 video_duration = getattr(scene, 'video_duration', '5s')
-                model = getattr(scene, 'video_model', 'ray-2')
                 
-                resolution, aspect_ratio, video_duration = validate_video_settings(resolution, aspect_ratio, video_duration)
+                # Get model (provider-specific defaults)
+                if provider == "klingai":
+                    model = getattr(scene, 'video_model', None) or "kling-v1"
+                else:  # lumaai
+                    model = getattr(scene, 'video_model', None) or "ray-2"
                 
-                logger.info(f"Generating video from prompt: {scene.prompt_video[:100]}...", extra={"task_id": task_id})
+                # Validate and normalize video settings (for LumaAI)
+                if provider == "lumaai":
+                    resolution, aspect_ratio, video_duration = validate_video_settings(resolution, aspect_ratio, video_duration)
+                
+                # E-commerce workflow: If prompt_image is provided, generate image first
+                # Then use that generated image for video generation
+                # Note: prompt_video_image is no longer used - we use product_images from video_context instead
+                image_url = None
+                generated_image_path = None
+                
+                if scene.prompt_image and provider == "klingai":
+                    # Generate image from prompt_image with product images as reference
+                    logger.info(f"[{scene_id}] E-commerce workflow: Generating image from prompt_image first", extra={"task_id": task_id})
+                    
+                    # Determine image provider (default to openai for e-commerce)
+                    image_provider = getattr(scene, 'image_provider', 'openai').lower()
+                    
+                    if image_provider == "openai":
+                        api_key = os.environ.get("OPENAI_API_KEY")
+                        if not api_key:
+                            logger.error("OPENAI_API_KEY environment variable not set.", extra={"task_id": task_id})
+                            raise RuntimeError("OPENAI_API_KEY environment variable not set.")
+                    elif image_provider == "freepik":
+                        api_key = os.environ.get("FREEPIK_API_KEY")
+                        if not api_key:
+                            logger.error("FREEPIK_API_KEY environment variable not set.", extra={"task_id": task_id})
+                            raise RuntimeError("FREEPIK_API_KEY environment variable not set.")
+                    elif image_provider == "gemini":
+                        api_key = None
+                    else:
+                        logger.error(f"Unsupported image provider: {image_provider}", extra={"task_id": task_id})
+                        raise RuntimeError(f"Unsupported image provider: {image_provider}")
+                    
+                    # Note: Product images will be analyzed by GPT-4 Vision in generate_image_from_prompt
+                    # to enhance the prompt with actual visual details from the product images
+                    enhanced_prompt = scene.prompt_image
+                    
+                    # Get product images from video_context (will be used by GPT-4 Vision for analysis)
+                    product_images = []
+                    if video_context and isinstance(video_context, dict):
+                        context_product_images = video_context.get('product_images', [])
+                        if context_product_images and isinstance(context_product_images, list):
+                            product_images = [img for img in context_product_images if img]
+                            logger.info(f"[{scene_id}] Found {len(product_images)} product image(s) in video_context - will be analyzed with GPT-4 Vision", extra={"task_id": task_id})
+                    
+                    # Generate image - save to ./tmp for OpenAI images (don't delete)
+                    # Force OpenAI for e-commerce workflow (required for GPT-4 Vision product image analysis)
+                    if image_provider != "openai":
+                        logger.warning(f"[{scene_id}] E-commerce workflow requires OpenAI for product image analysis. Overriding {image_provider} to openai.", extra={"task_id": task_id})
+                        image_provider = "openai"
+                        api_key = os.environ.get("OPENAI_API_KEY")
+                        if not api_key:
+                            raise RuntimeError("OPENAI_API_KEY environment variable not set for e-commerce workflow.")
+                    
+                    if image_provider == "openai":
+                        # Create ./tmp directory if it doesn't exist
+                        tmp_dir = "./tmp"
+                        os.makedirs(tmp_dir, exist_ok=True)
+                        out_path = os.path.join(tmp_dir, f"openai_generated_{uuid.uuid4().hex}.png")
+                        logger.info(f"[{scene_id}] Generating image using OpenAI (e-commerce workflow with product image analysis): {enhanced_prompt[:100]}...", extra={"task_id": task_id})
+                        generated_image_path = generate_image_from_prompt(
+                            enhanced_prompt, 
+                            api_key, 
+                            out_path, 
+                            provider=image_provider, 
+                            scene_context=scene_context, 
+                            video_context=video_context
+                        )
+                        # Don't add to temp_files for OpenAI - keep the image
+                        logger.info(f"[{scene_id}] ✅ OpenAI image saved to: {os.path.abspath(generated_image_path)}", extra={"task_id": task_id})
+                    else:
+                        # For other providers, use temp directory and add to temp_files
+                        out_path = os.path.join(tempfile.gettempdir(), f"generated_{uuid.uuid4().hex}.png")
+                        logger.info(f"[{scene_id}] Generating image from prompt using {image_provider}: {enhanced_prompt[:100]}...", extra={"task_id": task_id})
+                        generated_image_path = generate_image_from_prompt(
+                            enhanced_prompt, 
+                            api_key, 
+                            out_path, 
+                            provider=image_provider, 
+                            scene_context=scene_context, 
+                            video_context=video_context
+                        )
+                        temp_files.append(generated_image_path)
+                        logger.info(f"[{scene_id}] Generated image for video: {generated_image_path}", extra={"task_id": task_id})
+                    
+                    # Upload generated image to R2 to get a URL for KlingAI
+                    if generated_image_path and os.path.exists(generated_image_path):
+                        try:
+                            from video_generator.cleanup_utils import upload_to_r2
+                            bucket_name = Config.R2_BUCKET_NAME
+                            image_filename = f"generated_images/{task_id or 'temp'}/{os.path.basename(generated_image_path)}"
+                            uploaded_url = upload_to_r2(generated_image_path, bucket_name, image_filename)
+                            
+                            if uploaded_url:
+                                image_url = uploaded_url
+                                logger.info(f"[{scene_id}] Uploaded generated image to R2: {image_url}", extra={"task_id": task_id})
+                            else:
+                                logger.warning(f"[{scene_id}] Failed to upload image to R2, using local path (may not work with KlingAI)", extra={"task_id": task_id})
+                                # Fallback: if R2 upload fails, we can't use local path with KlingAI
+                                # So we'll proceed without image_url
+                        except Exception as e:
+                            logger.warning(f"[{scene_id}] Failed to upload generated image to R2: {e}. Proceeding without image URL.", extra={"task_id": task_id})
+                            # Continue without image_url if upload fails
+                
+                generation_type = "image+text-to-video" if image_url and provider == "klingai" else "text-to-video"
+                logger.info(f"Generating video from {generation_type} using {provider}: {scene.prompt_video[:100]}...", extra={"task_id": task_id})
+                
                 video_path = generate_video_from_prompt(
                     prompt=scene.prompt_video,
+                    image_url=image_url,
                     duration=video_duration,
                     resolution=resolution,
                     aspect_ratio=aspect_ratio,
                     model=model,
+                    provider=provider,
                     task_id=task_id
                 )
                 temp_files.append(video_path)
@@ -883,6 +1027,18 @@ def generate_video_core(request_dict, task_id=None):
     @monitor_performance("video_generation_total")
     def _generate_video_internal():
         request = copy.deepcopy(request_dict)
+        
+        # Normalize field names: convert video_prompt -> prompt_video and image_prompt -> prompt_image
+        # This handles payloads from e-commerce config generator that use different field names
+        if "scenes" in request:
+            for scene in request["scenes"]:
+                # Convert image_prompt to prompt_image if needed
+                if 'image_prompt' in scene and 'prompt_image' not in scene:
+                    scene['prompt_image'] = scene.pop('image_prompt')
+                
+                # Convert video_prompt to prompt_video if needed
+                if 'video_prompt' in scene and 'prompt_video' not in scene:
+                    scene['prompt_video'] = scene.pop('video_prompt')
         temp_files = []
         scene_files = []
         use_global_narration = bool(request.get("narration_text"))
@@ -956,16 +1112,34 @@ def generate_video_core(request_dict, task_id=None):
                 for idx, scene in enumerate(request["scenes"]):
                     logger.info(f"Scene {idx+1}: type={scene.get('type')}, narration_text={scene.get('narration_text', 'None')[:50]}...", extra={"task_id": task_id})
                 
-                logger.info(f"Starting parallel processing of {len(request['scenes'])} scenes - order will be preserved", extra={"task_id": task_id})
-                
-                scene_results = optimizer.parallel_process_scenes(
-                    request["scenes"], 
-                    process_scene_parallel, 
-                    use_global_narration=use_global_narration,
-                    global_audio_prompt_url=global_audio_prompt_url,
-                    global_subtitle_config=global_subtitle_config,
-                    task_id=task_id
+                # Check if any scenes use KlingAI
+                has_klingai = any(
+                    scene.get('video_provider', '').lower() == 'klingai' or 
+                    scene.get('prompt_video') and scene.get('video_provider', '').lower() == 'klingai'
+                    for scene in request["scenes"]
                 )
+                
+                if has_klingai:
+                    logger.info("KlingAI detected in scenes - limiting concurrent processing to 3 for KlingAI scenes", extra={"task_id": task_id})
+                    scene_results = _process_scenes_with_klingai_limit(
+                        request["scenes"],
+                        process_scene_parallel,
+                        optimizer,
+                        use_global_narration=use_global_narration,
+                        global_audio_prompt_url=global_audio_prompt_url,
+                        global_subtitle_config=global_subtitle_config,
+                        task_id=task_id
+                    )
+                else:
+                    logger.info(f"Starting parallel processing of {len(request['scenes'])} scenes - order will be preserved", extra={"task_id": task_id})
+                    scene_results = optimizer.parallel_process_scenes(
+                        request["scenes"], 
+                        process_scene_parallel, 
+                        use_global_narration=use_global_narration,
+                        global_audio_prompt_url=global_audio_prompt_url,
+                        global_subtitle_config=global_subtitle_config,
+                        task_id=task_id
+                    )
                 
                 # Debug: Log results
                 logger.info(f"Scene processing results: {len(scene_results)} successful scenes", extra={"task_id": task_id})
@@ -1006,7 +1180,8 @@ def generate_video_core(request_dict, task_id=None):
                         video_context = {
                             "narration_text": request.get("narration_text"),
                             "theme": request.get("scenes"),
-                            "output_filename": request.get("output_filename")
+                            "output_filename": request.get("output_filename"),
+                            "product_images": request.get("product_images", [])  # For e-commerce workflow
                         }
                         
                         # Apply global logo if no per-scene logo is configured
@@ -1087,9 +1262,16 @@ def generate_video_core(request_dict, task_id=None):
                     final_clip = concatenate_videoclips([final_clip, black_clip], method="compose")
                 elif final_clip.duration > max_duration:
                     logger.warning(f"Final video duration {final_clip.duration:.2f}s exceeds {max_duration}s. Trimming.", extra={"task_id": task_id})
-                    final_clip = final_clip.subclip(0, max_duration)
+                    # Trim before adding logo to avoid CompositeVideoClip.subclip() issue
+                    try:
+                        final_clip = final_clip.subclip(0, max_duration)
+                    except AttributeError:
+                        # If subclip() doesn't work (e.g., CompositeVideoClip from padding), use with_duration()
+                        logger.warning("subclip() failed, using with_duration() as fallback", extra={"task_id": task_id})
+                        final_clip = final_clip.with_duration(max_duration)
                 
                 # Add final logo if global logo is configured and cta_screen is enabled
+                # Note: Logo is added AFTER trimming to avoid CompositeVideoClip.subclip() issues
                 if global_logo and global_logo.cta_screen:
                     try:
                         logger.info(f"Adding final logo to concatenated video: {global_logo.url}", extra={"task_id": task_id})
@@ -1183,6 +1365,107 @@ def generate_video_core(request_dict, task_id=None):
             raise
     
     return _generate_video_internal()
+
+def _process_scenes_with_klingai_limit(scenes, process_func, optimizer, **kwargs):
+    """
+    Process scenes with a limit of 3 concurrent KlingAI video generations.
+    KlingAI scenes are processed in batches of 3, while other scenes can be processed normally.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+    from video_generator.logging_utils import get_logger
+    
+    logger = get_logger()
+    task_id = kwargs.get('task_id')
+    
+    # Separate scenes into KlingAI and non-KlingAI groups
+    klingai_scenes = []
+    other_scenes = []
+    
+    for idx, scene in enumerate(scenes):
+        # Normalize field names if needed (video_prompt -> prompt_video)
+        if 'video_prompt' in scene and 'prompt_video' not in scene:
+            scene['prompt_video'] = scene.pop('video_prompt')
+        
+        is_klingai = (
+            scene.get('video_provider', '').lower() == 'klingai' and 
+            scene.get('prompt_video')  # Only if it actually needs video generation
+        )
+        if is_klingai:
+            klingai_scenes.append((idx, scene))
+        else:
+            other_scenes.append((idx, scene))
+    
+    logger.info(
+        f"Separated scenes: {len(klingai_scenes)} KlingAI scenes, {len(other_scenes)} other scenes",
+        extra={"task_id": task_id}
+    )
+    
+    results = []
+    KLINGAI_MAX_CONCURRENT = 3
+    
+    # Process KlingAI scenes in batches of 3
+    if klingai_scenes:
+        logger.info(
+            f"Processing {len(klingai_scenes)} KlingAI scenes in batches of {KLINGAI_MAX_CONCURRENT}",
+            extra={"task_id": task_id}
+        )
+        
+        # Process KlingAI scenes in batches
+        for batch_start in range(0, len(klingai_scenes), KLINGAI_MAX_CONCURRENT):
+            batch = klingai_scenes[batch_start:batch_start + KLINGAI_MAX_CONCURRENT]
+            batch_num = (batch_start // KLINGAI_MAX_CONCURRENT) + 1
+            total_batches = (len(klingai_scenes) + KLINGAI_MAX_CONCURRENT - 1) // KLINGAI_MAX_CONCURRENT
+            
+            logger.info(
+                f"Processing KlingAI batch {batch_num}/{total_batches} ({len(batch)} scenes)",
+                extra={"task_id": task_id}
+            )
+            
+            # Create a limited executor for this batch
+            with ThreadPoolExecutor(max_workers=KLINGAI_MAX_CONCURRENT) as klingai_executor:
+                futures = []
+                for scene_idx, scene in batch:
+                    future = klingai_executor.submit(process_func, scene, scene_idx, **kwargs)
+                    futures.append((future, scene_idx))
+                
+                # Wait for all in this batch to complete
+                for future, scene_idx in futures:
+                    try:
+                        result = future.result()
+                        results.append(result)
+                    except Exception as e:
+                        logger.error(
+                            f"KlingAI scene {scene_idx} processing failed: {e}",
+                            extra={"task_id": task_id}
+                        )
+                        raise
+    
+    # Process other scenes in parallel (no limit)
+    if other_scenes:
+        logger.info(
+            f"Processing {len(other_scenes)} non-KlingAI scenes in parallel",
+            extra={"task_id": task_id}
+        )
+        
+        # Use the optimizer's executor for non-KlingAI scenes
+        futures = []
+        for scene_idx, scene in other_scenes:
+            future = optimizer.executor.submit(process_func, scene, scene_idx, **kwargs)
+            futures.append((future, scene_idx))
+        
+        # Wait for all non-KlingAI scenes to complete
+        for future, scene_idx in futures:
+            try:
+                result = future.result()
+                results.append(result)
+            except Exception as e:
+                logger.error(
+                    f"Non-KlingAI scene {scene_idx} processing failed: {e}",
+                    extra={"task_id": task_id}
+                )
+                raise
+    
+    return results
 
 def process_scene_parallel(scene, scene_idx, use_global_narration, global_audio_prompt_url, global_subtitle_config, task_id):
     """Process a single scene for parallel execution."""

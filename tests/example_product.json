@@ -1,0 +1,11 @@
+{
+  "name": "Wireless Bluetooth Headphones",
+  "price": 99.99,
+  "description": "Premium noise-cancelling wireless headphones with 30-hour battery life and crystal-clear audio quality",
+  "images": [
+    "https://example.com/headphones-front.jpg",
+    "https://example.com/headphones-side.jpg",
+    "https://example.com/headphones-in-use.jpg"
+  ]
+}
+

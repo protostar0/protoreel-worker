@@ -87,7 +87,7 @@ def generate_narration_elevenlabs(
         logger.info(f"[NARRATION] Attempting ElevenLabs TTS for text: {text[:60]}...")
         
         # Default voice ID (Rachel - high quality female voice)
-        default_voice_id = voice_id or os.environ.get("ELEVENLABS_VOICE_ID", "RaFzMbMIfqBcIurH6XF9")
+        default_voice_id = voice_id or os.environ.get("ELEVENLABS_VOICE_ID", "dXtC3XhB9GtPusIpNtQx")
         
         # Default model (can use "eleven_turbo_v2_5" for faster, lower latency)
         default_model_id = model_id or os.environ.get("ELEVENLABS_MODEL_ID", "eleven_multilingual_v2")

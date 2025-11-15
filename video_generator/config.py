@@ -27,6 +27,9 @@ class Config:
     # Image generation settings
     DEFAULT_IMAGE_PROVIDER = os.environ.get("DEFAULT_IMAGE_PROVIDER", "gemini")
     
+    # Video generation settings
+    DEFAULT_VIDEO_PROVIDER = os.environ.get("DEFAULT_VIDEO_PROVIDER", "lumaai")  # "lumaai" or "klingai"
+    
     # API Key for your service
     API_KEY = os.environ.get("PROTOVIDEO_API_KEY", "N8S6R_TydmHr58LoUzYZf9v2gRkcfWZemz1zWZ5WMkE")
     
