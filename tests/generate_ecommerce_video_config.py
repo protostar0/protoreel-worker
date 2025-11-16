@@ -112,11 +112,23 @@ PHASE 2 – IMAGE PROMPT GENERATION
 
 Generate one vivid 2:3 vertical cinematic image prompt per scene.
 
+CRITICAL: The prompt_image describes the FIRST FRAME of the video - it must be extremely detailed and match exactly what the video will start with.
+
 Each image prompt must:
 
 - Begin with: "Create an image of the product featured in the ad..."
 
-- Include cinematic descriptors (lighting, color mood, setting, emotion, camera angle)
+- Describe the EXACT first frame of the video scene in extreme detail:
+  * Exact product position, angle, and orientation
+  * Precise lighting (direction, intensity, color temperature)
+  * Background details (texture, color, depth of field)
+  * Camera angle and perspective (close-up, medium shot, wide shot)
+  * Product state (if it's a blender, is it closed? open? with ingredients?)
+  * Any props or elements visible in the first frame
+  * Color palette and mood
+  * Composition and framing
+
+- The image prompt should be so detailed that someone could recreate the exact first frame from your description
 
 - Reflect the tone and action of the corresponding script scene
 
@@ -154,17 +166,33 @@ PHASE 3 – VIDEO PROMPT GENERATION (KLING)
 
 Convert each image prompt into a cinematic video prompt.
 
+CRITICAL CONSTRAINTS FOR VIDEO AI:
+
+- The video AI is NOT good with complex actions or movements
+- AVOID complex actions like: mixing, blending, cutting, chopping, pouring, shaking vigorously, rapid movements
+- KEEP IT SIMPLE: Use smooth, gentle, slow movements only
+- Good movements: slow camera pan, gentle zoom in/out, slow rotation, smooth fade, gentle tilt
+- Bad movements: fast spinning, rapid mixing, chopping, pouring, shaking, complex multi-step actions
+- The video should start from the exact first frame described in prompt_image
+- Use simple, cinematic camera movements that showcase the product elegantly
+- Focus on smooth transitions and gentle motion
+- Think: product photography in motion, not action scenes
+
 Each video prompt:
 
-- Describes animation and motion for one scene
+- Describes smooth, simple animation and motion for one scene
 
 - Uses natural cinematic language
 
-- Includes motion, lighting, and emotional tone
+- Includes gentle motion, lighting, and emotional tone
 
 - Avoids text or brand names
 
 - Refers generically to the product ("the bottle," "the device," etc.)
+
+- MUST start from the exact first frame described in prompt_image
+
+- Keep movements simple and smooth - no complex actions
 
 Output format:
 
@@ -229,8 +257,7 @@ You MUST output ONLY valid JSON in this exact format:
       "video_provider": "klingai",
       "video_aspect_ratio": "9:16",
       "video_duration": "5s",
-      "video_model": "kling-v1",
-      "subtitle": true
+      "video_model": "kling-v1"
     }
   ],
   "post_description": "Engaging social media post description for the product"
@@ -238,13 +265,14 @@ You MUST output ONLY valid JSON in this exact format:
 
 IMPORTANT: 
 - Each scene should have narration_text (5 seconds worth of script)
-- prompt_image is for AI image generation (will use product_images from payload as reference)
-- prompt_video is for KlingAI video generation
+- prompt_image describes the EXACT first frame of the video - be extremely detailed
+- prompt_video is for KlingAI video generation - keep movements simple and smooth (no complex actions)
 - Product images are provided in the top-level product_images array and will be used as reference when generating images
 - Do NOT include prompt_video_image in scenes - product images are handled via video_context
-- All scenes must have subtitle: true
+- Do NOT include "subtitle" field in scenes - it will be handled automatically
 - Generate exactly 6 scenes (5 seconds each = 30 seconds total)
-- Include a compelling post_description for social media"""
+- Include a compelling post_description for social media
+- Video prompts must avoid complex actions - use only smooth, gentle camera movements"""
 
 
 def generate_video_config(
@@ -542,7 +570,9 @@ def generate_video_config(
         for idx, scene in enumerate(video_config['scenes']):
             # Set defaults
             scene.setdefault('type', 'video')
-            scene.setdefault('subtitle', True)
+            # Remove subtitle field if present (will be handled automatically)
+            if 'subtitle' in scene:
+                del scene['subtitle']
             scene.setdefault('video_provider', 'klingai')
             scene.setdefault('video_aspect_ratio', '9:16')
             scene.setdefault('video_duration', '5s')
@@ -625,8 +655,9 @@ def main():
         epilog="""
 Examples:
   # Using JSON input (recommended)  python tests/generate_ecommerce_video_config.py --product-json '{"name": "Nutribullet Portable 475ml cordless Blender for Shakes & Smoothies, BPA Free, Leakproof Flip and sip, USB-C type, PB475W, Black", "price": 1050.00, "description": "Premium audio quality", "images": ["https://m.media-amazon.com/images/I/61e0VzSXAbL._AC_SL1500_.jpg","https://m.media-amazon.com/images/I/61JGqf-NjmL._AC_SL1500_.jpg","https://m.media-amazon.com/images/I/710McmM3YbL._AC_SL1500_.jpg"]}'
+  # Using JSON input (recommended)  python tests/generate_ecommerce_video_config.py --product-json '{"name": "Kamikaze Green Hoodie", "price": 60.00, "description": "Premium audio quality", "images": ["https://shop.eminem.com/cdn/shop/products/oodiefront_1024x1024_efa5f221-995c-4ed8-910f-a2edf13716d3.png?v=1574892759&width=800","https://shop.eminem.com/cdn/shop/products/Kamikaze_Green_Hoodie_Male_Model_Front_1024x1024_f9d40831-2f58-4a08-a853-eb1f057ea1b8.jpg","https://shop.eminem.com/cdn/shop/products/Kamikaze_Green_Hoodie_Male_Model_Detail_1024x1024_b1ee8346-a923-48eb-a08d-00355ed45b8b.jpg"]}'
 
-  
+  https://shop.eminem.com/cdn/shop/products/Kamikaze_Green_Hoodie_Male_Model_Front_1024x1024_f9d40831-2f58-4a08-a853-eb1f057ea1b8.jpg?v=1574892759&width=800
   # Using JSON file
   python generate_ecommerce_video_config.py --product-json product.json
   

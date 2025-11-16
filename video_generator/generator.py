@@ -1104,8 +1104,11 @@ def generate_video_core(request_dict, task_id=None):
             else:
                 logger.info("No global transition config found, using defaults", extra={"task_id": task_id})
             
-            # Process scenes in parallel if multiple scenes
-            if len(request["scenes"]) > 1:
+            # Check if this is an e-commerce workflow (has product_images)
+            is_ecommerce = bool(request.get("product_images") and len(request.get("product_images", [])) > 0)
+            
+            # Process scenes in parallel if multiple scenes (unless e-commerce workflow)
+            if len(request["scenes"]) > 1 and not is_ecommerce:
                 logger.info(f"Processing {len(request['scenes'])} scenes in parallel", extra={"task_id": task_id})
                 
                 # Debug: Log each scene before processing
@@ -1157,8 +1160,11 @@ def generate_video_core(request_dict, task_id=None):
                     temp_files.extend(files_to_clean)
                     logger.info(f"Added scene {scene_index + 1} to final video", extra={"task_id": task_id})
             else:
-                # Process single scene sequentially
-                logger.info(f"Processing {len(request['scenes'])} scenes sequentially", extra={"task_id": task_id})
+                # Process scenes sequentially (single scene OR e-commerce workflow)
+                if is_ecommerce:
+                    logger.info(f"E-commerce workflow detected ({len(request.get('product_images', []))} product images) - processing {len(request['scenes'])} scenes sequentially", extra={"task_id": task_id})
+                else:
+                    logger.info(f"Processing {len(request['scenes'])} scenes sequentially", extra={"task_id": task_id})
                 
                 # Debug: Log each scene before processing
                 for idx, scene in enumerate(request["scenes"]):

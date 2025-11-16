@@ -344,6 +344,8 @@ def generate_image_from_prompt(prompt, api_key, out_path="generated_image.png", 
     # If product images are provided, try GPT-5 with image generation tool first
     # If GPT-5 is not available (e.g., organization not verified), fall back to DALL-E
     if product_images and len(product_images) > 0:
+        logger.info(f"Product images provided ({len(product_images)} image(s)) - will use for image generation reference")
+        logger.debug(f"Product image URLs: {product_images[:3]}")  # Log first 3 URLs
         try:
             if OPENAI_NEW_API:
                 logger.info("Attempting GPT-5 with image generation tool for product image reference (e-commerce workflow)")
@@ -357,14 +359,16 @@ def generate_image_from_prompt(prompt, api_key, out_path="generated_image.png", 
             else:
                 logger.warning(f"GPT-5 image generation failed, falling back to DALL-E with enhanced prompt: {e}")
             
-            # Fall back to the enhanced prompt approach
+            # Fall back to the enhanced prompt approach using GPT-4 Vision
             try:
+                logger.info(f"Analyzing {len(product_images)} product image(s) with GPT-4 Vision to enhance prompt...")
                 enhanced_prompt = analyze_product_images_with_vision(product_images, prompt, api_key)
-                logger.info("Using enhanced prompt based on product image analysis")
+                logger.info(f"Successfully enhanced prompt using product image analysis (length: {len(enhanced_prompt)} chars)")
             except Exception as e2:
-                logger.warning(f"Failed to analyze product images, using original prompt: {e2}")
+                logger.error(f"Failed to analyze product images with GPT-4 Vision: {e2}. Using original prompt (images may not match product).")
                 enhanced_prompt = prompt
     else:
+        logger.warning("No product images provided - generated image may not match the actual product")
         enhanced_prompt = prompt
     
     # Handle both old and new OpenAI API
@@ -385,33 +389,77 @@ def generate_image_from_prompt(prompt, api_key, out_path="generated_image.png", 
                     style="vivid"  # More accurate colors and details
                 )
                 # Access the image URL from the response
-                # The response.data might be a list-like object that needs proper handling
+                # OpenAI's ImagesResponse.data is a list, but we need to handle it carefully
                 try:
+                    # Direct access: response.data is typically a list of Image objects
                     if hasattr(response, 'data'):
-                        data = response.data
-                        # Convert to list if it's iterable but not a list
-                        if not isinstance(data, list):
-                            if hasattr(data, '__iter__') and not isinstance(data, (str, bytes)):
-                                data = list(data)
+                        # Try to get the first image directly
+                        # ImagesResponse.data should be a list, but let's be defensive
+                        try:
+                            # Most common case: response.data is a list
+                            if isinstance(response.data, list) and len(response.data) > 0:
+                                first_image = response.data[0]
+                            # If it's not a list but has __getitem__, try accessing [0]
+                            elif hasattr(response.data, '__getitem__'):
+                                first_image = response.data[0]
+                            # If it's iterable, convert to list first
+                            elif hasattr(response.data, '__iter__') and not isinstance(response.data, (str, bytes)):
+                                data_list = list(response.data)
+                                if len(data_list) > 0:
+                                    first_image = data_list[0]
+                                else:
+                                    raise RuntimeError("No image data in OpenAI response (empty iterator)")
                             else:
-                                # If it's a single object, wrap it in a list
-                                data = [data] if data else []
-                        
-                        if len(data) > 0:
-                            # Access the first item's url attribute
-                            first_item = data[0]
-                            if hasattr(first_item, 'url'):
-                                image_url = first_item.url
+                                # Single object case
+                                first_image = response.data
+                            
+                            # Extract URL from the image object
+                            if hasattr(first_image, 'url'):
+                                image_url = first_image.url
+                            elif isinstance(first_image, dict) and 'url' in first_image:
+                                image_url = first_image['url']
                             else:
-                                raise RuntimeError(f"Response data item has no 'url' attribute. Type: {type(first_item)}")
-                        else:
-                            raise RuntimeError("No image data in OpenAI response")
+                                raise RuntimeError(f"Image object has no 'url' attribute. Type: {type(first_image)}")
+                                
+                        except TypeError as e:
+                            # If we get "'ImagesResponse' object is not subscriptable", 
+                            # it means response.data itself is not subscriptable
+                            # Try accessing response.data as an attribute that might have a list
+                            logger.warning(f"Direct access failed: {e}. Trying alternative access methods...")
+                            
+                            # Alternative: check if response has a different structure
+                            # Some OpenAI SDK versions might structure this differently
+                            if hasattr(response, 'data') and hasattr(response.data, 'data'):
+                                # Nested data structure
+                                nested_data = response.data.data
+                                if isinstance(nested_data, list) and len(nested_data) > 0:
+                                    first_image = nested_data[0]
+                                    image_url = first_image.url if hasattr(first_image, 'url') else nested_data[0].get('url')
+                                else:
+                                    raise RuntimeError("Nested data structure is empty or invalid")
+                            else:
+                                # Last resort: try to iterate and get first item
+                                try:
+                                    first_image = next(iter(response.data))
+                                    image_url = first_image.url if hasattr(first_image, 'url') else None
+                                    if not image_url:
+                                        raise RuntimeError("Could not extract URL from iterated image object")
+                                except (StopIteration, TypeError) as iter_error:
+                                    raise RuntimeError(f"Could not iterate response.data: {iter_error}. "
+                                                      f"Type: {type(response.data)}")
                     else:
                         raise RuntimeError(f"Response object has no 'data' attribute. Type: {type(response)}")
-                except (TypeError, AttributeError, IndexError) as e:
-                    # Log the actual response structure for debugging
+                        
+                except (TypeError, AttributeError, IndexError, RuntimeError) as e:
+                    # Enhanced error logging
                     logger.error(f"Failed to access image URL from response. Response type: {type(response)}, "
                                f"Has 'data': {hasattr(response, 'data')}, Error: {e}")
+                    if hasattr(response, 'data'):
+                        logger.error(f"Response.data type: {type(response.data)}, "
+                                   f"Is list: {isinstance(response.data, list)}, "
+                                   f"Has __getitem__: {hasattr(response.data, '__getitem__')}, "
+                                   f"Has __iter__: {hasattr(response.data, '__iter__')}, "
+                                   f"Dir: {[x for x in dir(response.data) if not x.startswith('_')][:10]}")
                     raise RuntimeError(f"Failed to extract image URL from OpenAI response: {e}") from e
             else:
                 # Old OpenAI API (< v1.0)
