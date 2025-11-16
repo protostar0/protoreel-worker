@@ -443,11 +443,27 @@ def render_scene(scene: SceneInput, use_global_narration: bool = False, task_id:
                 enhanced_prompt = scene.prompt_image
                 
                 # Get product images from video_context (will be used by GPT-4 Vision for analysis)
-                product_images = None
+                product_images = []
                 if video_context and isinstance(video_context, dict):
                     product_images = video_context.get('product_images', [])
-                    if product_images and isinstance(product_images, list) and len(product_images) > 0:
+                    if product_images and isinstance(product_images, list):
                         logger.info(f"[{scene_id}] Found {len(product_images)} product image(s) in video_context - will be analyzed with GPT-4 Vision", extra={"task_id": task_id})
+                
+                # If scene has image_url, add it to product_images for OpenAI to use as reference
+                if scene.image_url:
+                    # Add scene.image_url to the front of product_images list (prioritize scene-specific image)
+                    if not isinstance(product_images, list):
+                        product_images = []
+                    product_images.insert(0, scene.image_url)
+                    logger.info(f"[{scene_id}] Using scene image_url as input reference: {scene.image_url}", extra={"task_id": task_id})
+                    logger.info(f"[{scene_id}] Total {len(product_images)} image(s) will be used as reference for OpenAI image generation", extra={"task_id": task_id})
+                
+                # Update video_context with combined product_images (including scene.image_url if provided)
+                if product_images and len(product_images) > 0:
+                    if not video_context:
+                        video_context = {}
+                    video_context = video_context.copy()  # Don't modify original
+                    video_context['product_images'] = product_images
                 
                 logger.info(f"[{scene_id}] Generating image from prompt using {provider}: {enhanced_prompt[:100]}...", extra={"task_id": task_id})
                 image_path = generate_image_from_prompt(enhanced_prompt, api_key, out_path, provider=provider, scene_context=scene_context, video_context=video_context)
@@ -618,6 +634,22 @@ def render_scene(scene: SceneInput, use_global_narration: bool = False, task_id:
                         if context_product_images and isinstance(context_product_images, list):
                             product_images = [img for img in context_product_images if img]
                             logger.info(f"[{scene_id}] Found {len(product_images)} product image(s) in video_context - will be analyzed with GPT-4 Vision", extra={"task_id": task_id})
+                    
+                    # If scene has image_url, add it to product_images for OpenAI to use as reference
+                    if scene.image_url:
+                        # Add scene.image_url to the front of product_images list (prioritize scene-specific image)
+                        if not isinstance(product_images, list):
+                            product_images = []
+                        product_images.insert(0, scene.image_url)
+                        logger.info(f"[{scene_id}] Using scene image_url as input reference for video scene image generation: {scene.image_url}", extra={"task_id": task_id})
+                        logger.info(f"[{scene_id}] Total {len(product_images)} image(s) will be used as reference for OpenAI image generation", extra={"task_id": task_id})
+                    
+                    # Update video_context with combined product_images (including scene.image_url if provided)
+                    if product_images and len(product_images) > 0:
+                        if not video_context:
+                            video_context = {}
+                        video_context = video_context.copy()  # Don't modify original
+                        video_context['product_images'] = product_images
                     
                     # Generate image - save to ./tmp for OpenAI images (don't delete)
                     # Force OpenAI for e-commerce workflow (required for GPT-4 Vision product image analysis)
@@ -792,10 +824,20 @@ def render_scene(scene: SceneInput, use_global_narration: bool = False, task_id:
         raise ValueError(f"Unsupported scene type: {scene.type}")
         
     # Add narration audio
+    # Extract existing audio from video (if any) to preserve it when mixing with narration/music
+    if video_clip.audio is not None:
+        try:
+            existing_audio = video_clip.audio
+            audio_clips.append(existing_audio)
+            logger.info(f"Preserved existing audio from video (duration: {existing_audio.duration:.2f}s)", extra={"task_id": task_id})
+        except Exception as e:
+            logger.warning(f"Could not extract existing audio from video: {e}", extra={"task_id": task_id})
+    
+    # Add narration to audio_clips list (instead of replacing video audio directly)
     if not use_global_narration:
         if narration_path:
             try:
-                logger.info(f"Adding narration audio to video clip.", extra={"task_id": task_id})
+                logger.info(f"Preparing narration audio for mixing.", extra={"task_id": task_id})
                 narration_clip = AudioFileClip(narration_path)
                 
                 # For image scenes: always match video duration to narration (no padding, no extension)
@@ -823,11 +865,12 @@ def render_scene(scene: SceneInput, use_global_narration: bool = False, task_id:
                         narration_padded = narration_clip
                         logger.info(f"Video scene: using full narration duration: {narration_clip.duration:.2f}s", extra={"task_id": task_id})
                 
-                video_clip = video_clip.with_audio(narration_padded)
-                logger.info(f"Audio synchronized: video={video_clip.duration}s, narration={narration_padded.duration}s", extra={"task_id": task_id})
+                # Add narration to audio_clips list (will be mixed with existing audio and music)
+                audio_clips.append(narration_padded)
+                logger.info(f"Narration added to audio mix (duration: {narration_padded.duration:.2f}s)", extra={"task_id": task_id})
                 
             except Exception as e:
-                logger.error(f"Failed to add narration audio: {e}", exc_info=True, extra={"task_id": task_id})
+                logger.error(f"Failed to prepare narration audio: {e}", exc_info=True, extra={"task_id": task_id})
                 raise
         # Add per-scene subtitles if requested
         if (
@@ -955,23 +998,27 @@ def render_scene(scene: SceneInput, use_global_narration: bool = False, task_id:
                 logger.warning(f"Failed to add logo to {scene.type} scene: {e}", exc_info=True, extra={"task_id": task_id})
                 # Continue without logo if it fails
         
-        # Handle music
+        # Handle music (add as background, will be mixed with existing audio and narration)
         if scene.music:
             try:
                 logger.info(f"Downloading music asset: {scene.music}", extra={"task_id": task_id})
                 music_path = download_asset(scene.music)
                 temp_files.append(music_path)
-                audio_clips.append(AudioFileClip(music_path).with_volume_scaled(0.3).with_duration(scene.duration))
-                logger.info(f"Added background music: {music_path}", extra={"task_id": task_id})
+                from moviepy import AudioFileClip
+                music_clip = AudioFileClip(music_path).with_volume_scaled(scene.music_volume or 0.3).with_duration(scene.duration)
+                audio_clips.append(music_clip)
+                logger.info(f"Added background music to audio mix: {music_path} (volume: {scene.music_volume or 0.3})", extra={"task_id": task_id})
             except Exception as e:
                 logger.error(f"Failed to download or process music: {e}", exc_info=True, extra={"task_id": task_id})
                 raise
-        # Mix audio
+        
+        # Mix all audio tracks together (existing audio + narration + music)
         if audio_clips:
             try:
-                logger.info(f"Mixing {len(audio_clips)} audio tracks for scene.", extra={"task_id": task_id})
+                logger.info(f"Mixing {len(audio_clips)} audio tracks for scene (existing audio + narration + music).", extra={"task_id": task_id})
                 composite_audio = CompositeAudioClip(audio_clips)
                 video_clip = video_clip.with_audio(composite_audio)
+                logger.info(f"Audio mixed successfully: {len(audio_clips)} tracks", extra={"task_id": task_id})
             except Exception as e:
                 logger.error(f"Failed to mix audio tracks: {e}", exc_info=True, extra={"task_id": task_id})
                 raise

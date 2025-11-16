@@ -23,85 +23,84 @@ def test_worker_job_mode():
     # 1. Create a task in the DB
     task_id = str(uuid.uuid4())
     user_api_key = "78c33510dbea4817910ec221c48191c1"
-    payload ={
-  "output_filename": "kamikaze-green-hoodie-30s.mp4",
-  "scenes": [
-    {
-      "type": "video",
-      "narration_text": "Flimsy hoodies? Nah—meet the heavy hitter you’ll wear nonstop.",
-      "prompt_image": "Create an image of the product featured in the ad as an ultra-detailed macro first frame: a deep olive green heavyweight hoodie laid flat on a seamless charcoal matte surface, oriented slightly diagonal with the hood at the top-left and the chest centered in frame. The camera is a tight close-up (macro, 100mm) on the chest area and upper hood seam, showing the dense knit texture and soft, brushed surface. A subtle tonal graphic across the chest is visible but not emphasized. Lighting: a single soft key from top-left at 45°, 5600K, creating gentle raking highlights that reveal fabric grain; low-intensity fill from bottom-right; edges fall into rich shadows. Background stays out of focus with shallow depth of field (f/2.8). Color palette: olive green, charcoal, soft highlights. No props, no text overlays. Vertical 2:3 composition with the chest graphic sitting on the upper third line and the hood edge just touching the top frame.",
-      "prompt_video": "Starting from the macro close-up of the chest and hood seam exactly as framed, perform a slow 5-second dolly-out of 5–8% to reveal a touch more of the hoodie shape while keeping the chest area dominant. Add a faint, soft light sweep from left to right across the fabric over the duration to emphasize texture. Maintain shallow depth of field and cinematic contrast. No fast movements, no text.",
-      "video_provider": "klingai",
-      "video_aspect_ratio": "9:16",
-      "video_duration": "5s",
-      "video_model": "kling-v1",
-      "duration": 5
-    },
-    {
-      "type": "video",
-      "narration_text": "This is the Kamikaze Green Hoodie—clean lines, rich olive tone, built for the grind.",
-      "prompt_image": "Create an image of the product featured in the ad as a full product showcase first frame: the olive green hoodie front-facing on an invisible hanger/mannequin, hood up, centered against a smooth dark gray seamless backdrop. The garment fills 70% of frame vertically, sleeves naturally relaxed. Kangaroo pocket clearly visible; minimal chest graphic appears subdued in black. Lighting: balanced studio setup—soft key from front-right (5600K), subtle rim lights from both sides to define silhouette, and a gentle top light for dimension. A faint shadow falls directly beneath the hem to ground the piece. Camera: medium shot at eye level, 50mm, straight-on perspective. Composition: perfectly centered, ample headroom, clean background, no props or text.",
-      "prompt_video": "From this exact centered front view, apply a gentle 3% parallax rotation to the left while slowly dollying in by 5% to add depth. Keep the hoodie perfectly crisp and the background smooth. Subtle specular highlights glide along the shoulders to accentuate form. No rapid motion, no additional elements.",
-      "video_provider": "klingai",
-      "video_aspect_ratio": "9:16",
-      "video_duration": "5s",
-      "video_model": "kling-v1",
-      "duration": 5
-    },
-    {
-      "type": "video",
-      "narration_text": "Heavyweight fabric, plush fleece interior, ribbed cuffs, and a deep kangaroo pocket.",
-      "prompt_image": "Create an image of the product featured in the ad as a detail-first frame: close-up of the left sleeve cuff of the olive hoodie, slightly rolled to reveal the soft, fuzzy fleece interior. The small red hexagonal patch near the cuff edge is in sharp focus. Camera at 45° angle from top-right, 85mm lens, tight crop so the cuff dominates the lower-right quadrant while the torso fabric softly fills the background. Lighting: warm neutral key (5200K) from right, gentle fill from left, subtle falloff creating dimensional shadows within the fleece. Background remains the same charcoal seamless, softly blurred. No added text or props.",
-      "prompt_video": "Starting from this tight cuff detail, execute a slow pan to the right of 6% while gently tilting down by 2% to trace along the cuff and reveal more of the plush interior and the red patch. Maintain soft, even motion and constant focus on the fabric texture. No fast actions.",
-      "video_provider": "klingai",
-      "video_aspect_ratio": "9:16",
-      "video_duration": "5s",
-      "video_model": "kling-v1",
-      "duration": 5
-    },
-    {
-      "type": "video",
-      "narration_text": "Throw it on—instant comfort, premium feel, low‑key street vibe all day.",
-      "prompt_image": "Create an image of the product featured in the ad worn by a model: a medium three‑quarter shot of a model wearing the olive green hoodie, hands resting inside the kangaroo pocket, hood relaxed, head slightly tilted down. The model stands slightly off-center to the right against a dark, moody studio gradient (black to deep charcoal). Camera at chest height, 70mm, slight angle from left to add depth. Lighting: dramatic key from left with soft falloff, subtle rim light from back-right creating a clean edge on the shoulder and hood, emphasizing the hoodie’s structure and drape. Fabric wrinkles look natural, chest graphic subdued. No brand text overlays or additional props.",
-      "prompt_video": "Begin exactly on this composed medium shot. Perform a slow dolly-in of 6% toward the chest area while executing a gentle 2% vertical tilt up to bring attention to the hood and shoulders. Keep the model mostly still; let a soft light ripple roll across the fabric for mood. No abrupt changes.",
-      "video_provider": "klingai",
-      "video_aspect_ratio": "9:16",
-      "video_duration": "5s",
-      "video_model": "kling-v1",
-      "duration": 5
-    },
-    {
-      "type": "video",
-      "narration_text": "Close-up quality: sturdy stitching, durable print, and that clean sleeve detail.",
-      "prompt_image": "Create an image of the product featured in the ad as a proof-of-quality frame: an extreme close-up on the hoodie’s kangaroo pocket seam and lower torso, showing tight, even double stitching and the dense knit fabric. The camera is angled slightly upward from the lower-left at 60mm macro, with the seam running diagonally from bottom-left to center. Lighting: cool neutral (5600K) cross-light—one soft source from left to catch the seam ridge, a subtle kicker from right to separate the pocket edge; falloff to gentle shadows. Background remains the same charcoal seamless, heavily blurred. No props, no overlays.",
-      "prompt_video": "From this exact seam macro, add a slow 5-second tilt up of 5% to glide from the pocket seam toward the mid-chest area while maintaining crisp focus on stitching. Introduce a faint moving highlight passing along the seam to emphasize craftsmanship. Keep motion smooth and minimal.",
-      "video_provider": "klingai",
-      "video_aspect_ratio": "9:16",
-      "video_duration": "5s",
-      "video_model": "kling-v1",
-      "duration": 5
-    },
-    {
-      "type": "video",
-      "narration_text": "Limited drop—was $60, now $45. Tap Shop Now before your size’s gone.",
-      "prompt_image": "Create an image of the product featured in the ad for a conversion-focused CTA: the olive green hoodie centered on a low matte-black pedestal, front-facing, against a deep charcoal-to-black gradient. Camera: medium-wide, straight-on, 50mm, with the hoodie filling the upper two-thirds of frame. Lighting: crisp key from front, soft rims from both sides, a subtle glow halo behind the hoodie for emphasis. On the lower third, display pricing UI: OLD PRICE $60.00 in small white text with a bold red strike-through; NEW PRICE $45.00 larger and bright white, slightly glowing. At bottom-center, a pill-shaped button reading Shop Now glows soft neon green with a faint pulsating light. A right hand enters from the right edge just barely visible in the first frame, fingertips aligned to tap the button. Clean composition, vertical 2:3. No brand names.",
-      "prompt_video": "Starting on this exact CTA frame, gently dolly in by 6% over 5 seconds while the right hand slowly moves in a few centimeters to hover over and lightly tap the glowing button at the 4-second mark. Add a soft pulse to the NEW PRICE glow when the hand nears. Keep motion smooth and minimal; maintain focus on the hoodie and pricing.",
-      "video_provider": "klingai",
-      "video_aspect_ratio": "9:16",
-      "video_duration": "5s",
-      "video_model": "kling-v1",
-      "duration": 5
-    }
-  ],
-  "post_description": "Meet your new daily heavy hitter. The Kamikaze Green Hoodie delivers heavyweight comfort, a clean olive look, and premium details you can feel. Limited drop—was $60, now $45. Tap to cop before your size sells out. #streetwear #hoodie #dailyfit #mensstyle #unisex #olivegreen #cozyseason",
-  "product_images": [
-    "https://shop.eminem.com/cdn/shop/products/oodiefront_1024x1024_efa5f221-995c-4ed8-910f-a2edf13716d3.png?v=1574892759&width=800",
-    "https://shop.eminem.com/cdn/shop/products/Kamikaze_Green_Hoodie_Male_Model_Front_1024x1024_f9d40831-2f58-4a08-a853-eb1f057ea1b8.jpg",
-    "https://shop.eminem.com/cdn/shop/products/Kamikaze_Green_Hoodie_Male_Model_Detail_1024x1024_b1ee8346-a923-48eb-a08d-00355ed45b8b.jpg"
-  ]
-}
+#     payload = {
+#   "output_filename": "blvck-basquiat-crown-hoodie-30s.mp4",
+#   "scenes": [
+#     {
+#       "type": "video",
+#       "narration_text": "Not just a hoodie—wear the crown. Art you can feel, every day.",
+#       "prompt_image": "Create an image of the product featured in the ad from an ultra-close, macro perspective of the embroidered crown emblem on the chest of the black cotton hoodie. The frame is vertical 2:3. The camera is 10 cm from the fabric, angled slightly downward (15°) so the stitches catch highlights. The crown embroidery appears crisp and textured in off‑white thread against a matte, deep‑black knit. Lighting: a single narrow softbox at 45° front-right with 5000K neutral light; a faint rim fill from rear-left to reveal thread relief; high contrast; shallow depth of field so the emblem is sharp while surrounding fabric softly falls out of focus. Background is a charcoal-to-black seamless gradient with no text or logos. Composition: the crown sits slightly above center, occupying the middle third, with visible fabric grain and subtle shadows in the lower portion.",
+#       "prompt_video": "Start from the exact macro close-up frame described. Execute a slow, cinematic 8% push-in toward the embroidered crown while a gentle light sweep glides from right to left across the stitches to reveal texture. Keep the background static, depth of field shallow, and motion silky smooth—no sudden changes.",
+#       "video_provider": "klingai",
+#       "video_aspect_ratio": "9:16",
+#       "video_duration": "5s",
+#       "video_model": "kling-v1",
+#       "duration": 5
+#     },
+#     {
+#       "type": "video",
+#       "narration_text": "Meet the Blvck x Basquiat Crown Hoodie—100% cotton, super soft, built to stand out.",
+#       "prompt_image": "Create an image of the product featured in the ad as a full front view of the black hoodie suspended on an invisible hanger in a minimalist studio. Vertical 2:3 framing. The hood is slightly raised, front pocket openings visible, and the embroidered crown on the chest centered. Camera: medium shot at chest height with a 50mm lens equivalent, straight-on perspective. Lighting: large diffused key light from front-left (5600K), soft fill from right, and a subtle top hair light to define the hood. Background: smooth neutral gray seamless paper with a faint gradient from darker top to lighter bottom. The garment edges are clean and the cotton texture is lightly defined; no on-image text.",
+#       "prompt_video": "Begin exactly on the centered studio product frame. Perform a slow pedestal-up motion (about 6% vertical rise) combined with a gentle 5° clockwise yaw, revealing the hoodie’s form and hood shape. Keep lighting constant and movement smooth, like premium product cinematography.",
+#       "video_provider": "klingai",
+#       "video_aspect_ratio": "9:16",
+#       "video_duration": "5s",
+#       "video_model": "kling-v1",
+#       "duration": 5
+#     },
+#     {
+#       "type": "image",
+#       "narration_text": "Choose your vibe: deep black or twilight cream. Embroidered crown up front—minimal yet bold.",
+#       "prompt_image": "Create an image of the product featured in the ad showing the twilight cream color variant in a clean, front-facing studio shot. Vertical 2:3 framing. The hoodie is centered, hood gently lifted, and the dark embroidered crown emblem sits perfectly centered on the chest. Camera: straight-on medium shot with a 55mm lens look. Lighting: soft, even illumination from a large frontal softbox (5400K) with subtle edge lights to separate sleeves from the background. Background: warm light-gray seamless with smooth falloff; reflective surfaces are avoided for a matte, premium feel. Fabric texture on the cream cotton is visible around the pocket openings and cuff ribbing. No text or branding on the image.",
+#       "image_provider": "openai",
+#       "duration": 5
+#     },
+#     {
+#       "type": "video",
+#       "narration_text": "From studio to street, it drapes clean and keeps you cozy—premium weight without the bulk.",
+#       "prompt_image": "Create an image of the product featured in the ad being worn by a model standing still in an urban night setting. Vertical 2:3 framing. The model faces camera, hood up, hands relaxed by sides, wearing the black hoodie; the embroidered crown is centered and clearly visible. Background: defocused city lights with teal and amber bokeh, subtle reflections on a slightly wet pavement. Lighting: soft key at 4000K from front-left, a cool rim light from rear-right to outline the hood, and gentle fill to maintain detail in the black fabric. Camera: eye-level medium shot, slight downward angle (5°) for presence, shallow depth of field so the model and hoodie are crisp while the city remains blurred. No text in frame.",
+#       "prompt_video": "Start on the static, centered portrait with the model wearing the hoodie. Perform a slow, steady 10% dolly-in while adding a subtle 3° tilt up to emphasize the chest emblem and hood shape. Maintain shallow depth of field and gentle bokeh drift; the subject remains motionless for a calm, premium mood.",
+#       "video_provider": "klingai",
+#       "video_aspect_ratio": "9:16",
+#       "video_duration": "5s",
+#       "video_model": "kling-v1",
+#       "duration": 5
+#     },
+#     {
+#       "type": "image",
+#       "narration_text": "Details win: a subtle monochrome back graphic, clean lines, street-approved comfort.",
+#       "prompt_image": "Create an image of the product featured in the ad from a back view to highlight the subtle monochrome graphic. Vertical 2:3 framing. The black hoodie is displayed on an invisible form at a 3/4 back angle, slightly turned to the left so shoulder structure and hood volume are visible. The tonal graphic sits high on the back, visible but understated. Lighting: raking key light from right at 35° to bring out the print’s low-contrast texture; soft fill from left; 5200K neutral color. Background: deep gray seamless with a gentle vignette. Camera: medium shot, straight-on with a slight elevated viewpoint (5°) to keep the back panel flat and readable. No text or logos in frame.",
+#       "image_provider": "openai",
+#       "duration": 5
+#     },
+#     {
+#       "type": "image",
+#       "narration_text": "This drop won’t last. Limited time—tap Shop Now and claim your crown.",
+#       "prompt_image": "Create an image of the product featured in the ad as a conversion-focused CTA layout. Vertical 2:3 framing. Two hoodies are arranged front-facing: black on the left, twilight cream on the right, both evenly lit and centered slightly above mid-frame. Background: a sleek charcoal-to-stone gradient with a subtle spotlight bloom behind the products. Lighting: balanced softboxes (5600K) with gentle edge lights to separate each colorway. Add bold, clean CTA design elements: a glowing badge near the top reading “Limited Time”, and a prominent rounded button at the bottom center reading “Shop Now”. Include a subtle countdown icon next to the badge for urgency. Keep typography modern, minimal, and high-contrast; ensure the garments remain the focal point.",
+#       "image_provider": "openai",
+#       "duration": 5
+#     }
+#   ],
+#   "post_description": "Art meets street. The Blvck x Basquiat Crown Hoodie delivers premium 100% cotton comfort with an iconic embroidered crown and a subtle monochrome back graphic. Available in deep black and twilight cream. Limited time—tap to claim your crown. #Streetwear #Basquiat #Blvck #HoodieDrop #MinimalAesthetic #MonochromeStyle #UnisexStyle",
+#   "product_images": [
+#     "https://blvck.com/cdn/shop/files/Front_c112b621-08be-4f9c-9726-4fa326683518.jpg",
+#     "https://blvck.com/cdn/shop/files/Front_e3353e9e-ab41-4a69-b311-ad60962406d1.jpg",
+#     "https://blvck.com/cdn/shop/files/01_19fb1d50-1112-47e5-9591-ab832b04de48.jpg"
+#   ]
+# }
 
-    
+    payload = {
+    "output_filename": "blvck-basquiat-crown-hoodie-30s.mp4",
+    "scenes": [
+      {
+        "type": "video",
+        "video_url": "https://pub-497ff0d12ef74e099d02fb1d996b7d89.r2.dev/videos/1df6d1f2-9122-417b-872a-bd36e7c7dcaf/1df6d1f2-9122-417b-872a-bd36e7c7dcaf_blvck-basquiat-crown-hoodie-30s.mp4",
+        "music": "https://userupload.protoreel.com/musics/groovy-vibe-427121.mp3",
+        "music_volume": 0.3,
+        "duration": 30
+      }
+    ]
+    }
     create_task(task_id, user_api_key, payload)
     print(f"PYTHONPATH=. python main_worker.py --task-id {task_id}  --api-key {user_api_key}")
 
